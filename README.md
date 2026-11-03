@@ -2,7 +2,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-Turn a ChatGPT web session into an **OpenAI-compatible Chat Completions endpoint**, with **function calling, client-side MCP tools, and streaming responses**.
+Turn a ChatGPT web session into an **OpenAI-compatible Chat Completions and Codex Responses endpoints**, with **function calling, client-side MCP tools, and streaming responses**.
 
 Use the standard OpenAI SDK workflow: declare `tools`, receive `tool_calls`, execute them in your client, and send results back as `role: "tool"`. Existing clients that implement this Chat Completions tool loop can use the gateway by changing their base URL and API key, within the compatibility scope below.
 
@@ -11,6 +11,7 @@ Derived from [lanqian528/chat2api](https://github.com/lanqian528/chat2api), with
 ## Features
 
 - OpenAI-compatible `POST /v1/chat/completions` and `GET /v1/models`.
+- **Codex integration:** Responses SSE, function/custom/namespace tools, client-side MCP, bounded replay and compaction; explicit web and native backends. [Setup and limits](docs/codex-compatibility.md).
 - **Standard function tools:** `tools`, `tool_choice`, `parallel_tool_calls`, assistant `tool_calls`, matching `tool_call_id` results, and subsequent model turns.
 - **MCP integration:** your client connects to MCP servers, converts their tool schemas into function tools, executes requested MCP calls, and returns results to the model. A complete stdio example is included.
 - SSE response framing, including tool-call deltas, optional usage chunks, and `[DONE]`.
@@ -96,6 +97,14 @@ Supported controls include `tool_choice="auto"`, `"none"`, `"required"`, a named
 
 Internally, this is a text-protocol bridge over the web model, rather than native API function calling. Invalid or incomplete envelopes fail explicitly instead of being executed as partial calls. The OpenAI-compatible client protocol does not imply identical model reliability or latency to the official API.
 
+## Codex CLI and Responses
+
+Use the real Codex CLI with the gateway as its model provider. Codex retains its tools, MCP connections, sandbox and approvals. See [setup, backend differences and acceptance commands](docs/codex-compatibility.md), [provider/MCP configuration](examples/codex_gateway.toml), and [app-server example](examples/codex_app_server.py).
+
+Web `gpt-6-thinking` and native `gpt-6.1-terra` are distinct routes. Compatibility does not mean every native API capability exists on the web backend.
+
+Real CLI coding is qualified on native Terra. Web function/MCP calls passed, but web automatic shell/patch coding has **not passed**; see [acceptance evidence](docs/validation.md).
+
 ## MCP tools
 
 ```bash
@@ -115,7 +124,7 @@ MCP belongs to the client layer in this project. The gateway accepts the resulti
 
 ## Streaming and compatibility
 
-Set `stream=True` as usual. Tool mode and automatic continuation **buffer the model output before emitting SSE**, so they are not token-by-token live upstream streams. This allows complete tool-envelope validation and safe response assembly. Tool deltas, finish reasons, and `[DONE]` use the Chat Completions shape.
+For **Chat Completions**, set `stream=True` as usual. Tool mode and automatic continuation **buffer the model output before emitting SSE**, so they are not token-by-token live upstream streams. This allows complete tool-envelope validation and safe response assembly. Tool deltas, finish reasons, and `[DONE]` use the Chat Completions shape.
 
 | Capability | Support / scope |
 | --- | --- |
@@ -128,7 +137,8 @@ Set `stream=True` as usual. Tool mode and automatic continuation **buffer the mo
 | `reasoning_effort`, `thinking_effort` | Account/model dependent; see configuration below |
 | Legacy `functions` / `function_call` | Rejected; use `tools` / `tool_choice` |
 | Remote JSON Schema references | Rejected; local references only |
-| Responses API, hosted MCP tools, native API web search/code execution | Not implemented by this compatibility layer |
+| Responses API / Codex CLI | Supported within the [documented backend scope](docs/codex-compatibility.md) |
+| Hosted MCP / native API hosted web search or code execution on the web backend | Unsupported; use client tools |
 
 Standard API clients can use the supported flows normally. This is **not a claim of full parity with every OpenAI API endpoint or built-in tool**.
 

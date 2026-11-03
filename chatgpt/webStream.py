@@ -119,6 +119,7 @@ class ConversationState:
         self.last_assistant_id = None
         self.target_user_id = getattr(service, "input_message_id", None)
         self.user_seen = self.target_user_id is None
+        self.input_binding_observation = []
         self.poll_interval = 2.0
 
     def observation_ms(self):
@@ -134,9 +135,14 @@ class ConversationState:
     def bind_user(self, message):
         role = (message.get("author") or {}).get("role")
         mid = message.get("id")
+        if role == 'user' and len(self.input_binding_observation) < 32:
+            supplied = getattr(self.service, 'input_user_ids', [])
+            self.input_binding_observation.append({'target': mid == self.target_user_id,
+                'supplied_index': supplied.index(mid) if mid in supplied else None,
+                'target_seen_before': self.user_seen})
         if self.target_user_id and mid == self.target_user_id and role in (None, "user"):
             self.user_seen = True
-        elif self.target_user_id and self.user_seen and role == "user":
+        elif self.target_user_id and self.user_seen and role == "user" and mid not in getattr(self.service, 'input_user_ids', []):
             protocol_error("upstream_turn_mismatch", "Upstream data advanced to a different user turn")
 
     def snapshot(self, message):
@@ -417,6 +423,7 @@ class ConversationState:
             key = "/".join(str(v) if isinstance(v, (str, bool, type(None))) and v in known else "other" for v in values)
             states[key] = states.get(key, 0) + 1
         return {"events": self.events, "event_types": self.event_types, "message_states": states,
+                "input_binding_observation": self.input_binding_observation,
                 "upstream_error": copy.deepcopy(self.upstream_error),
                 "transport_observation": dict(self.transport_observation),
                 "websocket_attempts": copy.deepcopy(self.websocket_attempts),

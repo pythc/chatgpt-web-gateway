@@ -52,7 +52,7 @@ async def gateway_observation(request: Request, call_next):
     try:client_id = str(uuid.UUID(value)) if value else None
     except (ValueError, TypeError, AttributeError):client_id = None
     started = time.monotonic()
-    scoped = request.url.path.endswith("/v1/chat/completions")
+    scoped = request.url.path.endswith(("/v1/chat/completions", "/v1/responses", "/v1/responses/compact"))
     observer = observation.RequestObservation() if scoped else None
     token = observation._current.set(observer) if scoped else None
     try:

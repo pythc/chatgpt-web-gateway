@@ -26,6 +26,15 @@ async def complete(s,*items):
     return await format_not_stream_response(stream_response(s,replay,'gpt-6-thinking',262144),1,262144,'gpt-6-thinking')
 
 class LifecycleTests(unittest.IsolatedAsyncioTestCase):
+    def test_supplied_history_echo_after_target_is_not_a_new_turn(self):
+        s = service();s.input_message_id = 'target';s.input_user_ids = ['prior', 'target']
+        state = ConversationState(s)
+        for mid in ('prior', 'target', 'prior', 'target'):
+            state.feed({'type': 'input_message', 'input_message': {'id': mid, 'author': {'role': 'user'}}})
+        self.assertTrue(state.user_seen)
+        with self.assertRaises(UpstreamError):
+            state.feed({'type': 'input_message', 'input_message': {'id': 'foreign', 'author': {'role': 'user'}}})
+
     async def test_first_terminal_or_nonempty_event_is_not_lost(self):
         for status in ('in_progress','finished_successfully'):
             s=service();items=[{'message':message(status=status)}]

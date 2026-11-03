@@ -1,0 +1,25 @@
+# Merge provider settings into your own Codex configuration; do not put keys here.
+model_provider = "web_gateway"
+model = "gpt-6-thinking" # Native backend: select its actual catalog ID instead.
+
+[model_providers.web_gateway]
+name = "ChatGPT Web Gateway"
+base_url = "http://127.0.0.1:5005/<API_PREFIX>/v1"
+env_key = "OPENAI_API_KEY"
+wire_api = "responses"
+model_catalog_url = "http://127.0.0.1:5005/<API_PREFIX>/v1/codex/models"
+supports_websockets = false
+request_max_retries = 0
+stream_max_retries = 0
+
+# MCP connections, skills, sandbox policies, and approvals belong to Codex.
+# Example stdio MCP entry (use an absolute path for your installation):
+# [mcp_servers.example]
+# command = "/absolute/path/to/python"
+# args = ["/absolute/path/to/examples/mcp_server.py"]
+#
+# Example Streamable HTTP MCP entry:
+# [mcp_servers.remote_example]
+# url = "https://mcp.example.com/mcp"
+#
+# Use `codex mcp login remote_example` for supported OAuth servers.

@@ -1,0 +1,14 @@
+# Optional native backend using the operator's own existing Codex login.
+# Set the native base URL and actual allowed model IDs in private .env.
+services:
+  gateway:
+    environment:
+      RESPONSES_BACKEND: native
+      RESPONSES_CODEX_AUTH_FILE: /run/secrets/codex-auth.json
+    volumes:
+      - type: bind
+        source: ${CODEX_AUTH_SOURCE:?Set an absolute existing Codex auth.json path}
+        target: /run/secrets/codex-auth.json
+        read_only: true
+        bind:
+          create_host_path: false

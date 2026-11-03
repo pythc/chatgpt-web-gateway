@@ -2,7 +2,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-把 ChatGPT 网页会话转换为 **OpenAI 兼容的 Chat Completions API**，支持 **Function Calling、客户端 MCP 工具和流式响应**。
+把 ChatGPT 网页会话转换为 **OpenAI 兼容的 Chat Completions 和 Codex Responses API**，支持 **Function Calling、客户端 MCP 工具和流式响应**。
 
 沿用标准 OpenAI SDK 工作流：声明 `tools`，接收 `tool_calls`，在客户端执行，再通过 `role: "tool"` 回传结果。对于实现了这套 Chat Completions 工具循环的客户端，可以在下述兼容范围内通过修改 Base URL 和 API Key 接入。
 
@@ -11,6 +11,7 @@
 ## 功能
 
 - OpenAI 兼容的 `POST /v1/chat/completions` 和 `GET /v1/models`。
+- **Codex 接入**：Responses SSE、function/custom/namespace 工具、客户端 MCP、有界重放和压缩；明确区分网页与原生后端。[配置与边界](docs/codex-compatibility.zh-CN.md)。
 - **标准函数工具**：`tools`、`tool_choice`、`parallel_tool_calls`、assistant `tool_calls`、匹配的 `tool_call_id` 结果回传及后续模型回答。
 - **MCP 接入**：客户端连接 MCP 服务器，把工具 Schema 转为函数工具，执行模型请求的 MCP 调用，再回传结果。提供完整 stdio 示例。
 - SSE 响应格式，包含工具调用增量、可选 usage 块和 `[DONE]`。
@@ -96,6 +97,14 @@ python examples/tools.py
 
 内部实现是基于网页模型的文本协议桥接，并非原生 API Function Calling。非法或不完整的工具封装会明确失败，不执行半截调用。客户端协议兼容不代表模型可靠性、延迟也与官方 API 完全相同。
 
+## Codex CLI 与 Responses
+
+真实 Codex CLI 可将网关作为模型提供方，继续使用客户端工具、MCP、沙箱与审批。参见[配置、后端差异和验收命令](docs/codex-compatibility.zh-CN.md)、[provider/MCP 配置](examples/codex_gateway.toml)和 [app-server 示例](examples/codex_app_server.py)。
+
+网页 `gpt-6-thinking` 与原生 `gpt-6.1-terra` 是两条独立路由。兼容协议不代表网页后端拥有所有原生 API 能力。
+
+真实 CLI 编程验收通过的是原生 Terra；网页函数/MCP 已通过，但网页自动 Shell/补丁编程**未通过**，参见[验收记录](docs/validation.md)。
+
 ## MCP 工具
 
 ```bash
@@ -115,7 +124,7 @@ MCP tools/list → OpenAI tools → 模型 tool_calls
 
 ## 流式响应与兼容范围
 
-照常传入 `stream=True`。工具模式和自动续写模式会**先缓冲模型输出，再返回 SSE**，用于校验完整工具封装、组装回答；不是上游逐 token 实时透传。工具增量、结束原因和 `[DONE]` 使用 Chat Completions 格式。
+对于 **Chat Completions**，照常传入 `stream=True`。工具模式和自动续写模式会**先缓冲模型输出，再返回 SSE**，用于校验完整工具封装、组装回答；不是上游逐 token 实时透传。工具增量、结束原因和 `[DONE]` 使用 Chat Completions 格式。
 
 | 能力 | 支持范围 |
 | --- | --- |
@@ -128,7 +137,8 @@ MCP tools/list → OpenAI tools → 模型 tool_calls
 | `reasoning_effort`、`thinking_effort` | 取决于账号及模型，见下方配置 |
 | 旧式 `functions` / `function_call` | 拒绝；请用 `tools` / `tool_choice` |
 | JSON Schema 远程引用 | 拒绝；只接受本地引用 |
-| Responses API、托管 MCP 工具、API 原生搜索/代码执行 | 此兼容层未实现 |
+| Responses API / Codex CLI | 在[明确的后端范围](docs/codex-compatibility.zh-CN.md)内支持 |
+| 网页后端托管 MCP、API 原生托管搜索/代码执行 | 不支持；使用客户端工具 |
 
 标准 API 客户端可以正常使用已支持的流程，但**不代表完整覆盖 OpenAI 所有接口和内置工具**。
 

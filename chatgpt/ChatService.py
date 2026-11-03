@@ -174,6 +174,8 @@ class ChatService:
             selected = next((m for m in catalog if m["slug"] == self.origin_model), None)
             if selected is None:
                 raise HTTPException(status_code=404, detail={"code": "model_not_found", "message": "Model is not listed for this account"})
+            if selected.get('is_work_mode_model') or self.origin_model.endswith('-wm'):
+                raise HTTPException(status_code=400, detail={"code": "model_requires_native_responses", "message": "Work-mode models require the native Responses backend"})
             self.gizmo_id = None
             self.req_model = self.origin_model
             self.resp_model = self.origin_model
@@ -244,7 +246,9 @@ class ChatService:
             config = get_config(self.user_agent, self.req_token)
             p = get_requirements_token(config)
             data = {'p': p}
-            r = await self.ss.post(url, headers=headers, json=data, timeout=5)
+            requirements_timeout = 20 if (getattr(self, 'responses_request', False) or getattr(self, 'responses_live', False)) else 5
+            r = await self.ss.post(url, headers=headers, json=data,
+                                   timeout=min(requirements_timeout, self.lifecycle_budget.remaining()))
             error_observation.upstream_status(r.status_code)
             if r.status_code == 200:
                 resp = r.json()
@@ -355,6 +359,7 @@ class ChatService:
             logger.error("Failed to format messages")
             raise HTTPException(status_code=400, detail="Failed to format messages.")
         self.input_message_id = next((m["id"] for m in reversed(chat_messages) if m.get("author", {}).get("role") == "user"), None)
+        self.input_user_ids = [m['id'] for m in chat_messages if m.get('author', {}).get('role') == 'user']
         self.chat_headers = self.base_headers.copy()
         self.chat_headers.update(
             {
