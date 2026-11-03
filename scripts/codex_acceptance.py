@@ -24,7 +24,7 @@ def inline(value):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--case', choices=('hello', 'coding', 'mcp'), required=True)
-    parser.add_argument('--mcp-python', help='Python with examples/requirements.txt installed')
+    parser.add_argument('--mcp-python', help='Python with requirements.examples.txt installed')
     parser.add_argument('--output', default='diagnostics/codex-acceptance.json')
     parser.add_argument('--timeout', type=int, default=300)
     parser.add_argument('--websocket', action='store_true', help='Opt in to single-lane gateway WebSocket')
