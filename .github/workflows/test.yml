@@ -1,0 +1,17 @@
+name: Offline regression tests
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Cache tokenizer for offline tests
+        run: python -c "import tiktoken; tiktoken.get_encoding('cl100k_base')"
+      - run: python scripts/test.py

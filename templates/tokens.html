@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer"><title>ChatGPT Web Gateway 本地账号配置</title>
+<style>body{font:16px/1.6 system-ui,sans-serif;margin:60px auto;padding:0 24px;max-width:640px;color:#1e293b;background:#f8fafc}main{background:white;padding:28px;border:1px solid #dbe3ec;border-radius:16px}h1{font-size:24px;margin-top:0}input{box-sizing:border-box;width:100%;font:inherit;padding:12px;border:1px solid #94a3b8;border-radius:8px}button{font:inherit;padding:10px 20px;background:#2563eb;color:white;border:0;border-radius:8px;cursor:pointer}button:disabled{opacity:.6}p{color:#475569}#result{white-space:pre-wrap;font-weight:600}label{display:block;margin-bottom:8px}</style></head>
+<body><main><h1>ChatGPT Web Gateway 本地账号配置</h1><p>当前已保存账号数：<strong id="count">{{ tokens_count }}</strong></p><p>粘贴 ChatGPT 的 accessToken，或包含 accessToken 的会话 JSON。凭证输入隐藏，仅提交到本机服务。</p>
+<form id="form" method="post" action="{{ '/' + api_prefix if api_prefix else '' }}/tokens/upload" autocomplete="off"><label for="token">ChatGPT 登录凭证</label><input id="token" type="password" name="text" autocomplete="off" spellcheck="false" required><p id="length" aria-live="polite">尚未输入</p><button id="submit" type="submit">保存到本机</button></form><p id="result" role="status" aria-live="polite"></p><p>保存成功只代表已录入，真实对话仍需单独验证。</p></main>
+<script>
+const form=document.getElementById('form'),input=document.getElementById('token'),button=document.getElementById('submit'),result=document.getElementById('result');
+input.addEventListener('input',()=>{document.getElementById('length').textContent=input.value.length?'已输入 '+input.value.length+' 个字符':'尚未输入';});
+form.addEventListener('submit',async(event)=>{event.preventDefault();result.textContent='';let token=input.value.trim();
+try{if(token.startsWith('{'))token=JSON.parse(token).accessToken;if(typeof token!=='string'||!token||/\s/.test(token))throw Error('请粘贴完整的 accessToken 值，或包含该字段的会话 JSON。');
+button.disabled=true;result.textContent='正在保存…';const response=await fetch(form.action,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({text:token}),signal:AbortSignal.timeout(10000)});
+if(!response.ok)throw Error('保存失败，HTTP '+response.status);const data=await response.json();if(data.status!=='success')throw Error('服务未确认保存成功。');document.getElementById('count').textContent=data.tokens_count;input.value='';document.getElementById('length').textContent='输入已清空';result.textContent='已保存到本地账号池。当前账号数：'+data.tokens_count+'。可运行 examples/chat.py 验证真实对话。';
+}catch(error){result.textContent=error.name==='TimeoutError'?'保存超时，请刷新页面核对账号数后再决定是否重试。':error.message;}finally{token='';button.disabled=false;}});
+</script></body></html>

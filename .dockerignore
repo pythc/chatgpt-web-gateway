@@ -1,0 +1,15 @@
+.git
+.env
+.env.*
+data
+logs
+diagnostics
+backups
+research
+.venv*
+**/__pycache__
+**/*.pyc
+**/*.log
+**/*.pem
+**/*.key
+.DS_Store

@@ -1,0 +1,20 @@
+services:
+  gateway:
+    build: .
+    image: chatgpt-web-gateway:local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5005:5005"
+    env_file:
+      - .env
+    environment:
+      API_PREFIX: ${API_PREFIX:?Run python3 scripts/configure.py first}
+      AUTHORIZATION: ${AUTHORIZATION:?Run python3 scripts/configure.py first}
+    volumes:
+      - ./data:/app/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "2"

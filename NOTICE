@@ -1,0 +1,10 @@
+ChatGPT Web Gateway is derived from lanqian528/chat2api.
+Upstream: https://github.com/lanqian528/chat2api
+Upstream baseline: a63a90cec90dea3fea3e272d22f8c5799de14e30
+The original MIT license and copyright notice are retained in LICENSE.
+
+This distribution adds client function-tool compatibility, client-side MCP
+examples, strict model selection, bounded continuation/recovery, request
+lifecycle ownership, safe error metadata and portable regression tests.
+
+This is an independent community project, not an official OpenAI API service.
