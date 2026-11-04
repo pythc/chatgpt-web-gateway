@@ -2,10 +2,21 @@ name: Publish preview release
 "on":
   push:
     tags: ["v[0-9]*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing preview tag to qualify without rebuilding
+        required: true
+        default: v0.1.0
+      digest:
+        description: Existing GHCR index digest (sha256) from the failed build
+        required: true
 permissions:
   contents: read
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 jobs:
   publish:
@@ -18,19 +29,22 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
           persist-credentials: false
       - name: Validate release source
+        id: source
         env:
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ env.RELEASE_TAG }}
           GH_TOKEN: ${{ github.token }}
         run: |
           [[ "$TAG" =~ ^v0\.[0-9]+\.[0-9]+$ ]]
           test "$(cat version.txt)" = "${TAG#v}"
           test -f "docs/releases/${TAG#v}.md"
           git merge-base --is-ancestor HEAD origin/main
-          gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" > /tmp/releases.json
-          python -c 'import json,os; assert not any(r["tag_name"] == os.environ["TAG"] for r in json.load(open("/tmp/releases.json"))), "Release already exists; choose a new version"'
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" > /tmp/releases.json
+          python -c 'import json,os; assert not any(r["tag_name"] == os.environ["TAG"] for page in json.load(open("/tmp/releases.json")) for r in page), "Release already exists; choose a new version"'
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.11'
@@ -47,38 +61,54 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build versioned images
+        if: github.event_name != 'workflow_dispatch'
         id: image
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/pythc/chatgpt-web-gateway:${{ github.ref_name }}
+          tags: ghcr.io/pythc/chatgpt-web-gateway:${{ env.RELEASE_TAG }}
           labels: |
             org.opencontainers.image.source=https://github.com/pythc/chatgpt-web-gateway
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ github.ref_name }}
+            org.opencontainers.image.revision=${{ steps.source.outputs.commit }}
+            org.opencontainers.image.version=${{ env.RELEASE_TAG }}
             org.opencontainers.image.licenses=MIT
       - name: Qualify published digest on both architectures
         env:
-          DIGEST: ${{ steps.image.outputs.digest }}
+          DIGEST: ${{ steps.image.outputs.digest || inputs.digest }}
         run: |
-          for platform in linux/amd64 linux/arm64; do
-            docker run --rm --platform "$platform" --network none --entrypoint python "ghcr.io/pythc/chatgpt-web-gateway@$DIGEST" scripts/test.py
-            docker run --rm --platform "$platform" --network none --entrypoint python "ghcr.io/pythc/chatgpt-web-gateway@$DIGEST" scripts/smoke_image.py
-          done
+          [[ "$DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
+          image=ghcr.io/pythc/chatgpt-web-gateway
+          test "$(docker buildx imagetools inspect "$image:$RELEASE_TAG" --format '{{.Manifest.Digest}}')" = "$DIGEST"
+          docker buildx imagetools inspect "$image@$DIGEST" --raw > /tmp/image-index.json
+          python - <<'PYPLATFORMS' > /tmp/image-platforms.txt
+          import json, re
+          manifests = json.load(open('/tmp/image-index.json'))['manifests']
+          for arch in ('amd64', 'arm64'):
+              matches = [m for m in manifests if m.get('platform', {}).get('os') == 'linux' and m['platform'].get('architecture') == arch]
+              assert len(matches) == 1, f'Expected exactly one linux/{arch} image'
+              digest = matches[0]['digest']
+              assert re.fullmatch(r'sha256:[a-f0-9]{64}', digest)
+              print(f'linux/{arch} {digest}')
+          PYPLATFORMS
+          while read -r platform manifest; do
+            docker run --rm --platform "$platform" --network none --entrypoint python "$image@$manifest" scripts/test.py
+            docker run --rm --platform "$platform" --network none --entrypoint python "$image@$manifest" scripts/smoke_image.py
+          done < /tmp/image-platforms.txt
       - name: Publish prerelease
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
-          DIGEST: ${{ steps.image.outputs.digest }}
+          TAG: ${{ env.RELEASE_TAG }}
+          DIGEST: ${{ steps.image.outputs.digest || inputs.digest }}
+          SOURCE_COMMIT: ${{ steps.source.outputs.commit }}
         run: |
           cp "docs/releases/${TAG#v}.md" /tmp/release-notes.md
           python - <<'PYNOTES'
           import os
           with open('/tmp/release-notes.md', 'a') as notes:
               notes.write('\n## Publication receipt\n\n')
-              notes.write('Source commit: `' + os.environ['GITHUB_SHA'] + '`\n\n')
+              notes.write('Source commit: `' + os.environ['SOURCE_COMMIT'] + '`\n\n')
               notes.write('Image: `ghcr.io/pythc/chatgpt-web-gateway@' + os.environ['DIGEST'] + '`\n\n')
               notes.write('Architectures: Linux amd64 and arm64. Both image digests passed offline regressions and synthetic HTTP startup.\n')
           PYNOTES

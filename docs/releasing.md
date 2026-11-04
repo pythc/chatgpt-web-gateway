@@ -28,8 +28,11 @@ its publication job. Fork workflows never publish into the upstream namespace.
 
 A build failure before push creates no image. A failure after push can leave an
 image without a Release; do not advertise it as a qualified release. Inspect the
-failed step first. Re-running the same source/tag may finish an interrupted
-publication, but must not replace an already published release. The workflow
+failed step first. After an interrupted post-push qualification, dispatch the publication workflow
+from `main` with the existing tag and exact index digest. This recovery path
+verifies the tag still resolves to that digest, tests each architecture by its
+child manifest digest, and skips rebuilding/pushing. It must not replace an
+already published release. The workflow
 refuses to start publication if the GitHub Release already exists. If published
 content must change, use a new patch version. Never delete private runtime state
 or restart a user's deployment as part of publication.
