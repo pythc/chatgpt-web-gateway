@@ -103,7 +103,7 @@ python examples/tools.py
 
 网页 `gpt-6-thinking` 与原生 `gpt-6.1-terra` 是两条独立路由。兼容协议不代表网页后端拥有所有原生 API 能力。
 
-真实 CLI 编程验收通过的是原生 Terra；网页函数/MCP 已通过，但网页自动 Shell/补丁编程**未通过**，参见[验收记录](docs/validation.md)。
+两条路由均已通过真实 CLI 编程验收。网页 `gpt-6-thinking` + High 用例实际执行 2 个 Shell 命令、1 次补丁，并运行原始测试通过；参见[验收记录](docs/validation.md)和[网页工具调用定位记录](docs/web-tool-dispatch.md)。
 
 ## MCP 工具
 

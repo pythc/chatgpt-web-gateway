@@ -30,10 +30,22 @@ tokens, local account files, request bodies, raw reasoning, or private diagnosti
   and actual MCP lookup passed. Gateway audits report completed requests as 200.
 - Native `previous_response_id`, V2 compaction, and post-compaction continuation passed.
 - Web `gpt-6-thinking`: real CLI hello passed after fixing repeated historical user
-  echoes. Real stdio MCP passed. Automatic coding did not pass and is recorded explicitly; native success does not replace it.
-- 258 offline tests across 15 suites passed, including actual loopback HTTP/WS,
+  echoes. Real stdio MCP passed. Web-only coding now passed on a clean image: 2 shell commands, 1 patch, client unittest, unchanged tests, and a completed turn; native success does not replace it.
+- 276 offline tests across 16 suites passed, including actual loopback HTTP/WS,
   ownership, replay, compaction boundaries, grammars, streaming, and disconnects.
 - Item 8 covers integration/examples; live app-server and web MCP checks are tracked
   under item 10. MCP OAuth/HTTP authentication is handled by the Codex client.
 
-Final acceptance and known web coding limitation: [validation.md](docs/validation.md).
+Final acceptance and remaining web protocol boundaries: [validation.md](docs/validation.md).
+
+
+## Web shell / patch root-cause investigation
+
+- [x] Capture actual CLI input and upstream message-channel metadata on a separate web candidate.
+- [x] Isolate the cause with a controlled web-only experiment; preserve model and effort.
+- [x] Implement the validated fix and review tool/result and instruction boundaries.
+- [x] Pass real Codex CLI shell, patch, unchanged-test and multi-turn acceptance.
+- [x] Run 276 offline tests across 16 suites and repeat coding/MCP on a clean image.
+- [x] Pass a second coding fixture with a Chinese filename containing a space.
+- [x] Update bilingual evidence and document remaining protocol/network boundaries.
+- [ ] Publish the reviewed fix and verify GitHub CI.

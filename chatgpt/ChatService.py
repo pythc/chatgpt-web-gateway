@@ -8,6 +8,7 @@ import time
 from urllib.parse import quote, urlsplit
 
 from fastapi import HTTPException
+from curl_cffi import CurlError
 from starlette.concurrency import run_in_threadpool
 
 from api.files import get_image_size, get_file_extension, determine_file_use_case
@@ -118,7 +119,8 @@ class ChatService:
 
         session_id = hashlib.md5(self.req_token.encode()).hexdigest()
         proxy_url = self.proxy_url.replace("{}", session_id) if self.proxy_url else None
-        self.s = Client(proxy=proxy_url, impersonate=self.impersonate)
+        self.s = Client(proxy=proxy_url, impersonate=self.impersonate,
+                        stream_on_primary=bool(getattr(self, 'responses_request', False)))
         if sentinel_proxy_url_list:
             sentinel_proxy_url = (random.choice(sentinel_proxy_url_list)).replace("{}", session_id) if sentinel_proxy_url_list else None
             self.ss = Client(proxy=sentinel_proxy_url, impersonate=self.impersonate)
@@ -247,8 +249,20 @@ class ChatService:
             p = get_requirements_token(config)
             data = {'p': p}
             requirements_timeout = 20 if (getattr(self, 'responses_request', False) or getattr(self, 'responses_live', False)) else 5
-            r = await self.ss.post(url, headers=headers, json=data,
-                                   timeout=min(requirements_timeout, self.lifecycle_budget.remaining()))
+            self.chat_requirements_connect_retries = 0
+            for attempt in range(2):
+                try:
+                    r = await self.ss.post(url, headers=headers, json=data,
+                        timeout=min(requirements_timeout, self.lifecycle_budget.remaining()))
+                    break
+                except CurlError as error:
+                    # This endpoint prepares a token; it never starts inference.
+                    # Retry one TLS handshake failure for web Responses only.
+                    # Generation POSTs and HTTP/auth/quota failures are excluded.
+                    if (attempt or error.code != 35 or not getattr(self, 'responses_request', False)
+                            or self.lifecycle_budget.remaining() <= 0):
+                        raise
+                    self.chat_requirements_connect_retries = 1
             error_observation.upstream_status(r.status_code)
             if r.status_code == 200:
                 resp = r.json()

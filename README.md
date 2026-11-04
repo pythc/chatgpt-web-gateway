@@ -103,7 +103,7 @@ Use the real Codex CLI with the gateway as its model provider. Codex retains its
 
 Web `gpt-6-thinking` and native `gpt-6.1-terra` are distinct routes. Compatibility does not mean every native API capability exists on the web backend.
 
-Real CLI coding is qualified on native Terra. Web function/MCP calls passed, but web automatic shell/patch coding has **not passed**; see [acceptance evidence](docs/validation.md).
+Real CLI coding passed on both routes. The web `gpt-6-thinking` + High fixture executed 2 shell commands, applied 1 patch, and ran the original tests successfully; see [acceptance evidence](docs/validation.md) and the [web dispatch investigation](docs/web-tool-dispatch.md).
 
 ## MCP tools
 

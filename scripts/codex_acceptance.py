@@ -8,6 +8,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import tempfile
@@ -41,13 +42,23 @@ def main():
     marker = output.with_suffix('.started')
     with os.fdopen(os.open(marker, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600), 'w') as f:
         json.dump({'case': args.case, 'model': model, 'started_at': time.time()}, f)
-    with tempfile.TemporaryDirectory(prefix='gateway-codex-acceptance-') as directory:
+    with tempfile.TemporaryDirectory(prefix='gateway-codex-acceptance-') as directory, \
+            tempfile.TemporaryDirectory(prefix='gateway-codex-home-') as home_directory:
         root = Path(directory)
+        # --ignore-user-config excludes config.toml, not installed skills or
+        # managed plugin state. Isolate this disposable client invocation too.
+        client_home = Path(home_directory)
+        # A CLI launched from Codex Desktop can inherit its tool pipe/session.
+        # The fixture must own its tools, while preserving ordinary PATH/proxy
+        # and gateway provider credentials from the invoking environment.
+        client_env = {k: v for k, v in os.environ.items() if not k.startswith('CODEX_')}
+        client_env['CODEX_HOME'] = str(client_home)
         command = ['codex', 'exec', '--ignore-user-config', '--ignore-rules', '--ephemeral',
             '--skip-git-repo-check', '--sandbox', 'workspace-write' if args.case == 'coding' else 'read-only',
             '-C', directory, '-m', model, '-c', 'model_provider="gateway_acceptance"',
             '-c', 'model_providers.gateway_acceptance=' + inline(config),
-            '-c', 'web_search="disabled"', '-c', 'features.apps=false', '--json']
+            '-c', 'web_search="disabled"', '-c', 'features.apps=false',
+            '-c', 'features.plugins=false', '-c', 'model_reasoning_effort="high"', '--json']
         receipt = root / 'mcp-receipt.jsonl'
         if args.case == 'coding':
             (root / 'calculator.py').write_text('def add(a, b):\n    return a - b\n')
@@ -55,10 +66,18 @@ def main():
             tests.write_text('import unittest\nfrom calculator import add\nclass TestAdd(unittest.TestCase):\n'
                 '    def test_positive(self): self.assertEqual(add(17, 25), 42)\n'
                 '    def test_negative(self): self.assertEqual(add(-3, 8), 5)\n')
+            # Normal coding clients inspect Git state and diffs after testing.
+            # Keep that verification inside a complete disposable repository.
+            subprocess.run(['git', 'init', '-q', directory], check=True)
+            subprocess.run(['git', 'add', 'calculator.py', 'test_calculator.py'], cwd=directory, check=True)
+            subprocess.run(['git', '-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false',
+                '-c', 'user.name=Gateway acceptance', '-c', 'user.email=acceptance@example.invalid',
+                'commit', '-qm', 'Acceptance baseline'], cwd=directory, check=True)
             digest = hashlib.sha256(tests.read_bytes()).digest()
             baseline = subprocess.run(['python3', '-m', 'unittest'], cwd=directory, capture_output=True)
             prompt = ('Inspect calculator.py and test_calculator.py. Fix add without modifying tests. '
-                      'Use tools to inspect, edit and run python3 -m unittest. Report verified results.')
+                      'Use client shell tools to inspect files, apply_patch to change the implementation, '
+                      'and client shell tools to run python3 -m unittest after the patch. Report verified results.')
         elif args.case == 'mcp':
             if not args.mcp_python:parser.error('--mcp-python is required for MCP acceptance')
             fixture = Path(__file__).resolve().parents[1] / 'tests/fixtures/codex_mcp_server.py'
@@ -70,9 +89,11 @@ def main():
         else:
             prompt = 'Reply exactly GATEWAY_CODEX_OK. Do not use tools.'
         began = time.monotonic()
-        summary = {'case': args.case, 'model_requested': model, 'real_upstream': True, 'passed': False}
+        summary = {'case': args.case, 'model_requested': model, 'reasoning_effort': 'high',
+                   'real_upstream': True, 'passed': False}
         try:
-            run = subprocess.run(command + [prompt], capture_output=True, text=True, timeout=args.timeout)
+            run = subprocess.run(command + [prompt], capture_output=True, text=True,
+                                 env=client_env, timeout=args.timeout)
             rows = []
             for line in run.stdout.splitlines():
                 try:rows.append(json.loads(line))
@@ -86,9 +107,15 @@ def main():
                 r.get('item', {}).get('type') == 'file_change' for r in rows)
             if args.case == 'coding':
                 final = subprocess.run(['python3', '-m', 'unittest'], cwd=directory, capture_output=True)
+                verified_by_client = any(r.get('type') == 'item.completed' and
+                    r.get('item', {}).get('type') == 'command_execution' and r['item'].get('exit_code') == 0 and
+                    re.search(r'\bpython(?:3(?:\.\d+)?)?\s+-m\s+unittest\b', r['item'].get('command', ''))
+                    for r in rows)
                 summary.update(baseline_failed=baseline.returncode != 0, final_tests_passed=final.returncode == 0,
-                               tests_unchanged=hashlib.sha256(tests.read_bytes()).digest() == digest)
-                valid = summary['baseline_failed'] and summary['final_tests_passed'] and summary['tests_unchanged']
+                               tests_unchanged=hashlib.sha256(tests.read_bytes()).digest() == digest,
+                               unit_tests_executed_by_client=verified_by_client)
+                valid = (summary['baseline_failed'] and summary['final_tests_passed'] and summary['tests_unchanged']
+                         and verified_by_client and summary['client_command_items'] >= 2 and summary['client_patch_items'] >= 1)
             elif args.case == 'mcp':
                 receipts = [json.loads(line) for line in receipt.read_text().splitlines()] if receipt.exists() else []
                 summary['mcp_executions'] = len(receipts)

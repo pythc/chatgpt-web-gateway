@@ -189,6 +189,11 @@ class GatewayRequestScope:
             pump_task.cancel();disconnect_wait.cancel()
             await asyncio.gather(pump_task, disconnect_wait, return_exceptions=True)
             try:
+                # The final HTTP body and disconnect can race while the owned
+                # worker closes. Preserve a logical SSE failure in that path.
+                if status < 400 and (state.get('gateway_protocol_terminal') == 'failed' or
+                        (state.get('gateway_trace') or {}).get('response_status') == 'failed'):
+                    status, outcome = 502, 'protocol_failed'
                 if not cleanup_pending:
                     if work is not None:consume(work)
                     ACTIVE_REQUESTS.pop(request_id, None)

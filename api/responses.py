@@ -166,7 +166,8 @@ async def web_events(data, credentials, budget, response, writer):
             # Envelopes remain buffered until validated. Ordinary final text
             # may stream; an ambiguous JSON/wrapper prefix waits for completion.
             stripped = text.lstrip()
-            plain = protocol.bridge is None or (protocol.bridge.choice == 'auto' and stripped and stripped[0] not in '{`<[')
+            plain = protocol.bridge is None or (not protocol.bridge.final_envelope and
+                protocol.bridge.choice == 'auto' and stripped and stripped[0] not in '{`<[')
             if plain and text:
                 if not started_text:
                     started_text = True
@@ -186,6 +187,7 @@ async def web_events(data, credentials, budget, response, writer):
         completion = {'id': response['id'], 'model': service.upstream_model or data['model'],
             'choices': [{'message': {'role': 'assistant', 'content': text}, 'finish_reason': finish}],
             'usage': {'prompt_tokens': service.prompt_tokens, 'completion_tokens': 0, 'total_tokens': service.prompt_tokens}}
+        observation.stage('tool_response_format')
         output, finish = await protocol.output(completion)
         if started_text:
             if len(output) != 1 or output[0]['type'] != 'message' or output[0]['content'][0]['text'] != sent:

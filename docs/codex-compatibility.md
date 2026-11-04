@@ -98,7 +98,9 @@ and results through Responses. For supported OAuth servers, use
 `codex mcp login <server>`. The gateway does not receive MCP OAuth credentials.
 
 Opt-in acceptance spends actual model usage, uses an isolated temporary workspace,
-and writes only a sanitized summary. Choose a unique output per run; the exclusive
+and a disposable client home, disables unrelated plugins, removes inherited Desktop
+session/tool-pipe variables, and writes only a sanitized summary. This invocation
+uses High reasoning and never edits user configuration. Choose a unique output per run; the exclusive
 `.started` marker prevents an accidental replay after an unknown timeout.
 
 ```sh

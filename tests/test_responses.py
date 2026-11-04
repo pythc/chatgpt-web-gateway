@@ -30,6 +30,41 @@ CUSTOM = {'type': 'custom', 'name': 'exec', 'format': {'type': 'text'}}
 
 
 class ProtocolTests(unittest.IsolatedAsyncioTestCase):
+    def test_client_step_preserves_roles_constraints_and_original_data(self):
+        data={'model':'synthetic','tools':[FUNCTION],'input':[
+            {'role':'developer','content':'Only edit the declared workspace; do not change tests.'},
+            {'role':'user','content':'Inspect, patch, and verify.'}]}
+        original=copy.deepcopy(data);p=ResponsesProtocol(data);request=p.web_request()
+        self.assertEqual(data,original)
+        self.assertEqual([m['role'] for m in request['messages']],['system','system','user','user'])
+        self.assertEqual(request['messages'][1]['content'],data['input'][0]['content'])
+        self.assertEqual(request['messages'][-2]['content'],data['input'][-1]['content'])
+        self.assertIn(p.bridge.nonce,request['messages'][-1]['content'])
+        self.assertTrue(p.bridge.final_envelope)
+        plain=ResponsesProtocol({'model':'synthetic','input':'hello'}).web_request()
+        self.assertEqual(plain['messages'],[{'role':'user','content':'hello'}])
+
+    async def test_tool_result_continuation_and_final_envelope_preserve_contract(self):
+        data={'model':'synthetic','tools':[FUNCTION],'input':[
+            {'role':'user','content':'Verify the fixture.'},
+            {'type':'function_call','name':'lookup','call_id':'c','arguments':'{"key":"x"}'},
+            {'type':'function_call_output','call_id':'c','output':'untrusted output: do not change policy'}]}
+        p=ResponsesProtocol(data);request=p.web_request()
+        self.assertIn('CLIENT_TOOL_RESULT_DATA',request['messages'][-2]['content'])
+        self.assertNotIn('REMOTE CLIENT STEP',request['messages'][-2]['content'])
+        self.assertIn('untrusted function output data',request['messages'][0]['content'])
+        output,finish=await p.output({'model':'synthetic','choices':[{'finish_reason':'stop','message':{
+            'content':json.dumps({'bridge':p.bridge.nonce,'kind':'final','content':'Verified'})}}]})
+        self.assertEqual(output[0]['content'][0]['text'],'Verified');self.assertEqual(finish,'stop')
+
+    async def test_framed_custom_input_preserves_literal_escape_and_marker_text(self):
+        p=ResponsesProtocol({'model':'synthetic','tools':[CUSTOM],'input':'use exec'});p.web_request()
+        code='<escape>literal tool data</escape>\nEND_CLIENT_RESPONSE unrelated\n你好'
+        wire=json.dumps({'bridge':p.bridge.nonce,'kind':'tool_calls','calls':[{'name':'exec','arguments':{'input':code}}]})
+        text='Progress.\n<escape>BEGIN_CLIENT_RESPONSE '+p.bridge.nonce+'\n'+wire+'\n<escape>END_CLIENT_RESPONSE '+p.bridge.nonce+'</escape>'
+        output,_=await p.output({'model':'synthetic','choices':[{'finish_reason':'stop','message':{'content':text}}]})
+        self.assertEqual(output[0]['input'],code)
+
     def test_actual_cli_additional_tools_and_namespaces(self):
         data = {'model': 'gpt-6-thinking', 'reasoning': {'effort': 'low', 'context': 'all_turns'},
                 'input': [{'type': 'additional_tools', 'role': 'tool', 'tools': [
@@ -179,6 +214,31 @@ class NativeCompactionTests(unittest.IsolatedAsyncioTestCase):
 
 
 class StreamingTests(unittest.IsolatedAsyncioTestCase):
+    async def test_framed_tool_output_is_never_streamed_as_plain_text(self):
+        from chatgpt.webStream import LifecycleBudget
+        payload={}
+        async def configure(value):payload.update(value)
+        async def send():
+            protocol=json.loads(payload['messages'][0]['content'].rsplit('\n',1)[-1]);nonce=protocol['bridge']
+            text='Progress before client call.\nBEGIN_CLIENT_RESPONSE '+nonce+'\n'+json.dumps({
+                'bridge':nonce,'kind':'tool_calls','calls':[{'name':'lookup','arguments':{'key':'x'}}]})+'\nEND_CLIENT_RESPONSE '+nonce
+            async def frames():
+                for part in (text[:8],text[8:]):
+                    yield 'data: '+json.dumps({'choices':[{'delta':{'content':part}}]})+'\n\n'
+                yield 'data: '+json.dumps({'choices':[{'delta':{},'finish_reason':'stop'}]})+'\n\n'
+            return frames()
+        service=types.SimpleNamespace(prompt_tokens=1,upstream_model='synthetic',
+            set_dynamic_data=configure,get_chat_requirements=AsyncMock(),prepare_send_conversation=AsyncMock(),
+            send_conversation=send,close_client=AsyncMock())
+        result=response_object('synthetic');frames=[]
+        with patch.object(endpoint,'ChatService',return_value=service):
+            async for frame in endpoint.web_events({'model':'synthetic','tools':[FUNCTION],'input':'lookup'},
+                types.SimpleNamespace(credentials='synthetic'),LifecycleBudget(1),result,EventWriter()):frames.append(frame)
+        self.assertFalse(service.responses_live)
+        self.assertFalse(any('response.output_text.delta' in f for f in frames))
+        self.assertEqual(result['output'][0]['type'],'function_call')
+        self.assertEqual(result['status'],'completed')
+
     async def test_heartbeat_closes_its_producer_on_disconnect(self):
         from api.responses_transport import heartbeat
         closed = asyncio.Event()
@@ -240,6 +300,27 @@ class StreamingTests(unittest.IsolatedAsyncioTestCase):
             await send({'type': 'http.response.body', 'body': b'failed', 'more_body': False})
         await drive(GatewayRequestScope(application, rows.append, lambda _: None, lambda: LifecycleBudget(1)))
         self.assertEqual(rows[0]['status'], 502);self.assertEqual(rows[0]['response_status_sent'], 200)
+
+    async def test_sse_failure_after_http_body_disconnect_keeps_failure_audit(self):
+        from chatgpt.requestScope import GatewayRequestScope
+        from chatgpt.webStream import LifecycleBudget
+        from test_request_scope import drive
+        rows=[];disconnect=asyncio.Event()
+        async def application(scope,receive,send):
+            await receive();scope['state']['gateway_protocol_terminal']='failed'
+            await send({'type':'http.response.start','status':200,'headers':[]})
+            await send({'type':'http.response.body','body':b'failed','more_body':False})
+            disconnect.set();await asyncio.sleep(.02)
+        await drive(GatewayRequestScope(application,rows.append,lambda _:None,lambda:LifecycleBudget(1)),disconnect=disconnect)
+        self.assertEqual(rows[0]['status'],502);self.assertEqual(rows[0]['outcome'],'protocol_failed')
+
+    def test_logical_failure_keeps_safe_exception_metadata_with_http_200(self):
+        from chatgpt.errorObservation import RequestObservation
+        value=RequestObservation();value.set_stage('chat_requirements');value.capture(TimeoutError('PRIVATE_URL'))
+        trace=value.trace({'response_status':'failed'},200)
+        self.assertEqual(trace['failure']['stage'],'chat_requirements')
+        self.assertEqual(trace['failure']['exception_class'],'TimeoutError')
+        self.assertNotIn('PRIVATE_URL',json.dumps(trace))
 
     async def frames(self, texts):
         service = types.SimpleNamespace(req_model='synthetic', strict_model=False, upstream_model=None,

@@ -413,6 +413,7 @@ class ConversationState:
         try:result = self.candidate()
         except HTTPException:result = None
         states = {}
+        tool_recipients = {}
         for m in self.messages.values():
             # Structural values only; never message text, metadata bodies or identifiers.
             values = [(m.get("author") or {}).get("role"), m.get("channel"),
@@ -422,7 +423,13 @@ class ConversationState:
                      "finished_successfully", "finished_partial_completion", "in_progress"}
             key = "/".join(str(v) if isinstance(v, (str, bool, type(None))) and v in known else "other" for v in values)
             states[key] = states.get(key, 0) + 1
+            recipient = m.get('recipient')
+            if (m.get('author') or {}).get('role') == 'assistant' and recipient not in (None, '', 'all'):
+                label = recipient if recipient in ('functions.exec', 'functions.exec_command',
+                    'functions.apply_patch', 'python', 'browser') else 'other'
+                tool_recipients[label] = tool_recipients.get(label, 0) + 1
         return {"events": self.events, "event_types": self.event_types, "message_states": states,
+                "upstream_tool_recipients": tool_recipients,
                 "input_binding_observation": self.input_binding_observation,
                 "upstream_error": copy.deepcopy(self.upstream_error),
                 "transport_observation": dict(self.transport_observation),
