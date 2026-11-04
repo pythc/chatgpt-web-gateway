@@ -63,6 +63,8 @@ The account setup page and legacy management routes have been removed. A fresh
 Compose project using a synthetic session-JSON credential file started successfully,
 served the English API metadata, and returned 404 for the old account routes. The
 credential file remained unchanged. This startup check did not access a real account.
+Post-upgrade model discovery returned HTTP 200 for both configured backends, and
+a real Codex CLI exact-answer request passed with web `gpt-6-thinking` + High.
 Both existing local instances were also upgraded with their original environment,
 credential mounts and data preserved; the previous images remain available for rollback.
 

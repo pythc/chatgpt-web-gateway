@@ -57,7 +57,8 @@ Final acceptance and remaining web protocol boundaries: [validation.md](docs/val
 - [x] Support operator-managed token files and session JSON without rewriting them.
 - [x] Make manual .env configuration the default English-first deployment flow.
 - [x] Complete regression, fresh Compose startup and local deployment checks.
-- [ ] Publish the configuration cleanup and verify CI.
+- [x] Publish the configuration cleanup and verify CI.
+- [ ] Merge configuration cleanup PR #2 into main.
 
 ## Additional live web qualification
 
