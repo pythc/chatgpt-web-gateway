@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions / 使用与配置问题
+    url: https://github.com/pythc/chatgpt-web-gateway/discussions
+    about: Ask for help or discuss an idea in English or Chinese.
+  - name: Private security report
+    url: https://github.com/pythc/chatgpt-web-gateway/security/advisories/new
+    about: Never post credentials or exploitation details in a public issue.

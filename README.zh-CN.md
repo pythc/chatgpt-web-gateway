@@ -157,6 +157,19 @@ docker run --rm --network none --entrypoint python \
 
 本机 Python 测试和主动触发的真实模型验收见[验证说明](docs/validation.md)。运行配置、账号文件、日志和本地工作笔记不应进入版本控制。
 
+## 社区
+
+使用问题和想法请到 [Discussions](https://github.com/pythc/chatgpt-web-gateway/discussions)，
+可复现缺陷和客户端实测结果请使用 [Issue 表单](https://github.com/pythc/chatgpt-web-gateway/issues/new/choose)。欢迎中英文反馈。
+
+[贡献指南](CONTRIBUTING.md) · [支持说明](SUPPORT.md) ·
+[行为准则](CODE_OF_CONDUCT.md) · [安全报告](SECURITY.md) ·
+[客户端兼容矩阵](docs/compatibility.md) · [更新日志](CHANGELOG.md) ·
+[版本发布与回滚](docs/releasing.md) · [演示步骤](docs/demo.md)
+
+公开路线图见 [Milestones](https://github.com/pythc/chatgpt-web-gateway/milestones)。
+0.x 为预览版，兼容性结论按客户端版本与后端分别记录。社区专项文档以英文为主。
+
 ## 许可证
 
 [MIT](LICENSE) · 基于 [lanqian528/chat2api](https://github.com/lanqian528/chat2api) 开发，上游署名见 [NOTICE](NOTICE)。独立社区项目，与 OpenAI 无隶属关系。

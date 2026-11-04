@@ -1,0 +1,5 @@
+# Use together with compose.yaml; --no-build prevents a local build.
+services:
+  gateway:
+    image: ${GATEWAY_IMAGE:-ghcr.io/pythc/chatgpt-web-gateway:v0.1.0}
+    pull_policy: always

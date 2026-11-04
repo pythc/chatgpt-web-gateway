@@ -1,0 +1,67 @@
+name: Bug report / 缺陷报告
+description: Report a reproducible gateway defect without private data.
+title: "[Bug]: "
+labels: [bug, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: "English / 中文均可。Never paste tokens, cookies, session JSON, raw model output, signed URLs or complete logs. See SUPPORT.md."
+  - type: input
+    id: version
+    attributes:
+      label: Gateway version or image digest
+    validations:
+      required: true
+  - type: dropdown
+    id: backend
+    attributes:
+      label: Backend
+      options: [Web, Native, Unknown]
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: Client and exact version
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: OS, architecture and deployment method
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Requested model ID and reasoning effort
+  - type: dropdown
+    id: transport
+    attributes:
+      label: Transport
+      options: [HTTP JSON, HTTP SSE, WebSocket, Unknown]
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Minimal synthetic reproduction
+      description: Include expected and actual behavior; use invented data.
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: Safe error summary
+      description: Error code/status, whether inference started, and a small manually redacted excerpt. No full data/ or diagnostics/ upload.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I checked support/compatibility docs and existing issues.
+          required: true
+        - label: I manually removed account data, secrets and private content.
+          required: true
