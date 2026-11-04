@@ -48,4 +48,4 @@ Final acceptance and remaining web protocol boundaries: [validation.md](docs/val
 - [x] Run 276 offline tests across 16 suites and repeat coding/MCP on a clean image.
 - [x] Pass a second coding fixture with a Chinese filename containing a space.
 - [x] Update bilingual evidence and document remaining protocol/network boundaries.
-- [ ] Publish the reviewed fix and verify GitHub CI.
+- [x] Publish the reviewed fix and verify GitHub CI.
