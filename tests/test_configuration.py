@@ -54,6 +54,14 @@ class CredentialFileTests(unittest.TestCase):
                     cwd=work, env=env, capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual((work/'data/token.txt').read_text(), 'legacy_token\n')
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory);(work/'version.txt').write_text('fixture')
+            env = {**os.environ, 'PYTHONPATH': str(ROOT), 'PYTHON_DOTENV_DISABLED': '1',
+                   'CHATGPT_TOKEN_FILE': '', 'RESPONSES_BACKEND': 'native'}
+            result = subprocess.run([sys.executable, '-c', 'import utils.globals as g; assert g.token_list == []'],
+                cwd=work, env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse((work/'data/token.txt').exists())
 
     def test_explicit_missing_file_and_invalid_json_fail_startup(self):
         for content in (None, '{"accessToken":"PRIVATE_CREDENTIAL_VALUE'):

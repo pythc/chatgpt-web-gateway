@@ -43,6 +43,8 @@ python scripts/codex_run.py --ephemeral --cwd /absolute/path/to/project \
 在私有 `.env` 中配置 `RESPONSES_BACKEND=native`、实际
 `RESPONSES_UPSTREAM_BASE_URL`、`RESPONSES_UPSTREAM_KEY` 和可选模型白名单。
 上游目录须为 Codex Models 格式，普通 OpenAI `/models` 列表不能直接替代。
+仅使用原生 Responses 时，将 `.env` 中的 `CHATGPT_TOKEN_FILE` 留空，无需网页
+账号文件；如同时使用 Chat Completions，则仍需配置网页凭证。
 对于管理员自己的现有 Codex 登录，可显式只读挂载登录文件：
 
 ```sh

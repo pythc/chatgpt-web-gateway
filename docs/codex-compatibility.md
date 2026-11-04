@@ -49,6 +49,8 @@ about the upstream model's maximum context. New CLI versions need qualification.
 Choose an authorized Responses backend with its actual model catalog. Set
 `RESPONSES_UPSTREAM_BASE_URL` and `RESPONSES_UPSTREAM_KEY` locally. The catalog
 must use Codex Models format; ordinary OpenAI `/models` format is insufficient.
+For native-only Responses, leave `CHATGPT_TOKEN_FILE` empty in `.env`; no web
+account file is required. Keep a web credential file if also using Chat Completions.
 For an operator's own Codex login, the optional override explicitly mounts its
 existing login file read-only:
 
