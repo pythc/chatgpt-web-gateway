@@ -14,3 +14,11 @@ research
 **/*.pem
 **/*.key
 .DS_Store
+
+# Local work notes
+TODO.md
+TASKS.md
+PLAN.md
+
+# Repository presentation assets are not runtime dependencies
+docs/assets

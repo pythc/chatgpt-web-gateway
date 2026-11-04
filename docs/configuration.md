@@ -94,3 +94,39 @@ An older image still contains the page. Rollback restores that image's behavior;
 to remove the page from an existing instance, deploy the new image rather than
 only editing `.env`. Token files remain compatible with the older line-oriented
 loader when using plain tokens; session JSON and JSON arrays require this version.
+
+## Models and request budgets
+
+`reasoning_effort` uses a local compatibility mapping: `low → min`,
+`medium → standard`, `high → extended`, `xhigh → max`. You can also supply the
+web `thinking_effort` value using the SDK's `extra_body`. Values must appear in
+the selected model's account-specific catalog; conflicting values are rejected.
+An explicit different model does not automatically inherit the default model's effort.
+
+| Environment variable | Sample value | Meaning |
+| --- | --- | --- |
+| `CHATGPT_TOKEN_FILE` | `data/token.txt` | Credential file path inside the container |
+| `DEFAULT_MODEL` | `gpt-6-thinking` | Default requested model |
+| `DEFAULT_REASONING_EFFORT` | `high` | Effort for the default model |
+| `HISTORY_DISABLED` | `true` | Temporary web conversations |
+| `AUTO_CONTINUE` | `true` | Assemble bounded continuations; per-request `auto_continue=false` disables this |
+| `AUTO_CONTINUE_MAX_ROUNDS` | `4` | Additional model turns allowed for continuation |
+| `AUTO_CONTINUE_MAX_TOKENS` | `65536` | Local assembled-output token cap |
+| `DEFAULT_TOOL_MAX_TOKENS` | `65536` | Default local tool-mode output cap |
+| `AUTO_CONTINUE_TIMEOUT` | `600` | Overall request work budget, including direct mode |
+| `CONVERSATION_TIMEOUT` | `180` | Conversation transport timeout |
+| `WEBSOCKET_IDLE_TIMEOUT` | `15` | Idle recovery wait |
+| `RECOVERY_MAX_SECONDS` | `120` | Recovery time budget |
+| `RECOVERY_MAX_READS` | `120` | Recovery read cap |
+
+These values come from `.env.example`; source fallbacks may differ. Continuation
+can make additional model requests and consume additional usage. It cannot bypass
+an upstream output cap or usage restriction, and it may return a partial answer
+with `finish_reason="length"` when a bound is reached.
+
+## Diagnostics
+
+Send a UUID in `X-Client-Request-Id` to correlate requests with `X-Request-Id`.
+Bounded lifecycle metadata is stored in `data/lifecycle-audit.jsonl` and
+`data/lifecycle-activity.jsonl`. Keep the runtime directory private. Model discovery
+HTTP 200 verifies the catalog; only a completed inference verifies a model request.
