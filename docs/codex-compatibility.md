@@ -49,6 +49,8 @@ about the upstream model's maximum context. New CLI versions need qualification.
 Choose an authorized Responses backend with its actual model catalog. Set
 `RESPONSES_UPSTREAM_BASE_URL` and `RESPONSES_UPSTREAM_KEY` locally. The catalog
 must use Codex Models format; ordinary OpenAI `/models` format is insufficient.
+For native-only Responses, leave `CHATGPT_TOKEN_FILE` empty in `.env`; no web
+account file is required. Keep a web credential file if also using Chat Completions.
 For an operator's own Codex login, the optional override explicitly mounts its
 existing login file read-only:
 
@@ -110,6 +112,29 @@ python scripts/codex_acceptance.py --case mcp \
   --mcp-python /absolute/path/to/python-with-example-dependencies \
   --output diagnostics/mcp.json
 ```
+
+For the additional web checks, use a quiet, isolated local web instance and its
+host-side lifecycle audit file. Set `RESPONSES_WEBSOCKET_ENABLED=true` on that
+instance before the WebSocket check. This suite verifies the actual backend and
+model from server audit entries; WebSocket acceptance rejects HTTP fallback and
+requires every observed warmup to have zero generation POSTs.
+
+```sh
+python scripts/web_qualification.py --case http-mcp \
+  --mcp-python /absolute/path/to/python-with-example-dependencies \
+  --audit-file data/lifecycle-audit.jsonl --output diagnostics/web-http-mcp.json
+python scripts/web_qualification.py --case app-server \
+  --audit-file data/lifecycle-audit.jsonl --output diagnostics/web-app-server.json
+python scripts/web_qualification.py --case previous-response \
+  --audit-file data/lifecycle-audit.jsonl --output diagnostics/web-previous.json
+python scripts/web_qualification.py --case websocket \
+  --audit-file data/lifecycle-audit.jsonl --output diagnostics/web-websocket.json
+```
+
+Check each result before starting the next case. Use a fresh output name for a
+new intentional run. Failed/unknown runs are not automatically replayed. The
+app-server fixture uses one ephemeral thread and two turns; response-ID testing
+uses gateway RAM replay with `store=false`, not native hidden-reasoning state.
 
 See [validation evidence](validation.md) for exactly which real routes passed.
 Offline protocol success alone does not establish live model availability.

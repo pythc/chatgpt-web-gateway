@@ -18,8 +18,8 @@ def main():
         stream.write(text)
     (ROOT / 'data').mkdir(mode=0o700, exist_ok=True)
     print('Created .env (0600) and data/. Credentials were not printed.')
+    print('Add your ChatGPT access token or session JSON to data/token.txt (0600).')
     print('Next: docker compose up -d --build')
-    print('Use API_PREFIX from .env to open http://127.0.0.1:5005/<API_PREFIX>/tokens')
 
 
 if __name__ == '__main__':

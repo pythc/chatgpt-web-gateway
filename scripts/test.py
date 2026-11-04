@@ -22,7 +22,7 @@ def main():
                'AUTHORIZATION': '', 'SCHEDULED_REFRESH': 'false', 'ENABLE_GATEWAY': 'false',
                'PYTHON_DOTENV_DISABLED': '1'}
         for name in list(env):
-            if name.startswith(('RESPONSES_', 'CODEX_WEB_')) or name == 'CODEX_MODEL_CATALOG_FILE':
+            if name.startswith(('RESPONSES_', 'CODEX_WEB_')) or name in ('CODEX_MODEL_CATALOG_FILE', 'CHATGPT_TOKEN_FILE'):
                 env.pop(name)
         for suite in sorted((ROOT / 'tests').glob('test_*.py')):
             try:

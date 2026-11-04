@@ -31,7 +31,7 @@ tokens, local account files, request bodies, raw reasoning, or private diagnosti
 - Native `previous_response_id`, V2 compaction, and post-compaction continuation passed.
 - Web `gpt-6-thinking`: real CLI hello passed after fixing repeated historical user
   echoes. Real stdio MCP passed. Web-only coding now passed on a clean image: 2 shell commands, 1 patch, client unittest, unchanged tests, and a completed turn; native success does not replace it.
-- 276 offline tests across 16 suites passed, including actual loopback HTTP/WS,
+- 288 offline tests across 18 suites passed, including actual loopback HTTP/WS,
   ownership, replay, compaction boundaries, grammars, streaming, and disconnects.
 - Item 8 covers integration/examples; live app-server and web MCP checks are tracked
   under item 10. MCP OAuth/HTTP authentication is handled by the Codex client.
@@ -49,3 +49,24 @@ Final acceptance and remaining web protocol boundaries: [validation.md](docs/val
 - [x] Pass a second coding fixture with a Chinese filename containing a space.
 - [x] Update bilingual evidence and document remaining protocol/network boundaries.
 - [x] Publish the reviewed fix and verify GitHub CI.
+
+## File-based deployment cleanup
+
+- [x] Verify that the local account form is a real credential-management route.
+- [x] Remove the account HTML and legacy HTTP credential/seed-management routes.
+- [x] Support operator-managed token files and session JSON without rewriting them.
+- [x] Make manual .env configuration the default English-first deployment flow.
+- [x] Complete regression, fresh Compose startup and local deployment checks.
+- [x] Publish the configuration cleanup and verify CI.
+- [ ] Merge configuration cleanup PR #2 into main.
+
+## Additional live web qualification
+
+Completed with real gpt-6-thinking + High on an independent web image. The suite
+checks execution receipts, exact randomized follow-ups and server transport audits.
+Earlier failed attempts remain recorded separately.
+
+- [x] Client-side Streamable HTTP MCP on the web backend.
+- [x] Real web app-server thread/start and follow-up turn.
+- [x] Real web previous_response_id continuation.
+- [x] Real CLI WebSocket response on the web backend.

@@ -19,7 +19,12 @@ class EventWriter:
     def frame(self, kind, **fields):
         event = {'type': kind, 'sequence_number': self.sequence, **fields}
         self.sequence += 1
-        return 'event: ' + kind + '\ndata: ' + json.dumps(event, ensure_ascii=False) + '\n\n'
+        return self.encode(event)
+
+    @staticmethod
+    def encode(event):
+        """Serialize an existing event without allocating another sequence."""
+        return 'event: ' + event['type'] + '\ndata: ' + json.dumps(event, ensure_ascii=False) + '\n\n'
 
     def item(self, item, index):
         shell = copy.deepcopy(item)
