@@ -6,12 +6,13 @@ from curl_cffi.requests import AsyncSession
 
 
 class Client:
-    def __init__(self, proxy=None, timeout=15, verify=True, impersonate='safari15_3'):
+    def __init__(self, proxy=None, timeout=15, verify=True, impersonate='safari15_3', stream_on_primary=False):
         self.proxies = {"http": proxy, "https": proxy}
         self.timeout = timeout
         self.verify = verify
 
         self.impersonate = impersonate
+        self.stream_on_primary = stream_on_primary
         # impersonate=self.impersonate
 
         # self.ja3 = ""
@@ -28,7 +29,10 @@ class Client:
         if self.session:
             headers = headers or self.session.headers
             cookies = cookies or self.session.cookies
-        r = await self.session2.post(*args, headers=headers, cookies=cookies, **kwargs)
+        # Web Responses preparation has already warmed this account's TLS
+        # connection. Reuse its pool instead of forcing a second handshake.
+        session = self.session if self.stream_on_primary else self.session2
+        r = await session.post(*args, headers=headers, cookies=cookies, **kwargs)
         return r
 
     async def get(self, *args, **kwargs):

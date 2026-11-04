@@ -30,7 +30,7 @@ class GatewayRequestScope:
         self.app, self.audit, self.activity, self.budget_factory = app, audit, activity, budget_factory
 
     async def __call__(self, scope, receive, send):
-        if scope['type'] != 'http' or not scope.get('path', '').endswith('/v1/chat/completions'):
+        if scope['type'] != 'http' or not scope.get('path', '').endswith(('/v1/chat/completions', '/v1/responses', '/v1/responses/compact')):
             return await self.app(scope, receive, send)
         state = scope.setdefault('state', {})
         request_id = str(uuid.uuid4())
@@ -144,11 +144,21 @@ class GatewayRequestScope:
             if work in done:
                 await work
                 status = response_status if response_status is not None else 500
+                if state.get('gateway_protocol_terminal') == 'failed':
+                    status, outcome = 502, 'protocol_failed'
                 if not response_complete:outcome = 'response_incomplete'
             elif disconnect_wait in done and not response_complete:
-                outcome, status = 'client_disconnected', 499
-                observer.capture(asyncio.CancelledError())
-                activity('client_disconnected', stage=observer.stage, budget=budget.summary())
+                terminal_state = state.get('gateway_protocol_terminal')
+                if terminal_state in ('completed', 'incomplete', 'failed'):
+                    # Codex legitimately closes the HTTP stream immediately
+                    # after the Responses terminal event, before HTTP EOF.
+                    outcome = 'protocol_' + terminal_state
+                    status = 502 if terminal_state == 'failed' else (response_status or 200)
+                    activity('protocol_terminal_disconnect', status=status, budget=budget.summary())
+                else:
+                    outcome, status = 'client_disconnected', 499
+                    observer.capture(asyncio.CancelledError())
+                    activity('client_disconnected', stage=observer.stage, budget=budget.summary())
                 await stop_owned_work()
             elif response_complete:
                 # A disconnect after the final body does not invalidate success.
@@ -179,6 +189,11 @@ class GatewayRequestScope:
             pump_task.cancel();disconnect_wait.cancel()
             await asyncio.gather(pump_task, disconnect_wait, return_exceptions=True)
             try:
+                # The final HTTP body and disconnect can race while the owned
+                # worker closes. Preserve a logical SSE failure in that path.
+                if status < 400 and (state.get('gateway_protocol_terminal') == 'failed' or
+                        (state.get('gateway_trace') or {}).get('response_status') == 'failed'):
+                    status, outcome = 502, 'protocol_failed'
                 if not cleanup_pending:
                     if work is not None:consume(work)
                     ACTIVE_REQUESTS.pop(request_id, None)

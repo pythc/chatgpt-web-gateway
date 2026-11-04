@@ -41,7 +41,7 @@ async def get_model_catalog(req_token, history_disabled=True):
             raise HTTPException(status_code=response.status_code,
                                 detail="ChatGPT rejected model discovery")
         payload = response.json()
-        models = [{k: m[k] for k in ("slug", "title", "thinking_efforts") if k in m}
+        models = [{k: m[k] for k in ("slug", "title", "thinking_efforts", "is_work_mode_model") if k in m}
                   for m in payload.get("models", []) if isinstance(m, dict) and isinstance(m.get("slug"), str)]
         if not models:
             raise HTTPException(status_code=502, detail="ChatGPT returned no usable model catalog")

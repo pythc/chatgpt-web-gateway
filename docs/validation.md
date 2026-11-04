@@ -1,37 +1,108 @@
 # Validation scope / 验证范围
 
-Publication checks (2026-11-03): a clean Docker build, **221 offline tests across
-13 suites**, isolated startup/HTTP validation with zero generation requests,
-configuration generation/overwrite protection, and actual local MCP `tools/list`
-and `tools/call` using the bundled example server. The SDK constructors and MCP
-result serialization were also checked with the pinned example SDK versions.
+Validated on **2026-11-04** with real Codex CLI **0.166.0-alpha.5.1**.
+The web and native backends are tested and reported separately. Web coding and
+stdio MCP below were rerun after the tool-dispatch fix on an independent image
+without diagnostic monkeypatches or a source bind. Native rows retain their
+earlier qualification; they are not substituted for web results.
 
-The offline suite covers client tool schemas and result associations, continuation
-boundaries, model/effort selection, final-answer states, signed WebSocket URL
-handling, recovery cursors and budgets, request deadlines/disconnects, and safe
-upstream error metadata. Inputs, account strings, and URLs in tests are synthetic.
+| Check | Native `gpt-6.1-terra` | Web `gpt-6-thinking` |
+|---|---|---|
+| Real CLI exact-answer request | Passed | Passed |
+| Real CLI implementation repair | Passed: 4 commands, 1 patch, failing tests became passing; tests unchanged | Passed with High: 2 shell commands, 1 patch, successful client-issued unittest; tests unchanged; CLI exit 0 and completed turn |
+| Real CLI Unicode filename with space | Not run | Passed with High: 2 shell commands, 1 patch, successful client unittest; tests unchanged; CLI exit 0 |
+| Client-side stdio MCP | Passed: actual random lookup and matching final answer | Passed: actual random lookup and matching final answer |
+| Client-side Streamable HTTP MCP | Passed: actual random lookup and matching final answer | Not run |
+| app-server thread/start and follow-up turn | Passed | Not run |
+| `previous_response_id` continuation | Passed against real upstream | Offline protocol checks |
+| Native V2 compaction and continuation | Passed: native opaque compaction item, then correct retained fact | Not applicable; web compaction is a gateway summary |
+| Real CLI WebSocket response | Passed; warmup recorded zero generation requests | Offline transport checks |
 
-Run `python scripts/test.py` from the repository root. Each suite runs in its own
-process using a temporary working directory. The test runner does not open the
-developer's `.env` or configured account pool. For enforced network isolation,
-use the `docker run --network none` command in the README.
+The coding acceptance is reproducible through
+`scripts/codex_acceptance.py`. Its fixture initially implements subtraction instead
+of addition. Acceptance requires the original tests to fail, actual shell and patch items, a
+successful client-issued unittest command, independently passing final tests, an
+unchanged test-file digest, and CLI exit 0 with a completed turn. Acceptance uses
+a temporary Git baseline and a disposable client home, excluding unrelated local
+skills/plugins and inherited Desktop session/tool-pipe variables. It runs High
+reasoning and does not edit global configuration.
+MCP servers generate a random value at startup and write a receipt only when the
+client actually executes the lookup. Matching that value establishes an actual
+tool round trip, not merely tool declaration or model-generated JSON.
 
-Function-tool and stdio MCP round trips were exercised against a configured local
-gateway during development in October 2026. Those historical checks are not a
-promise that an account, model, or current web protocol remains available. This
-source publication does not perform fresh ChatGPT generations or upload private
-acceptance records. The `examples/` scripts provide explicit live checks for a
-user-configured endpoint; running them consumes model usage.
+## Web dispatch fix and completed runs
 
-Known upstream `usage_limit` failures remain failures. Neither a passing offline
-suite nor a readable model catalog proves that the upstream allocation has reset.
+The original failed coding run is retained as the baseline: the upstream chose
+ChatGPT-internal `functions.exec` instead of handing client calls to Codex. The
+fix separates a remote-client control turn from caller messages and tool-result
+data, uses a nonce-bound call/final frame, normalizes only observed presentation
+wrappers, and buffers tool-enabled text until complete validation. See the
+[root-cause investigation](web-tool-dispatch.md).
 
-离线测试覆盖工具参数和结果关联、续写边界、模型与强度、最终正文状态、
-WebSocket 签名 URL、恢复游标与预算、超时/断开及安全错误元数据。
-测试使用临时目录和合成数据，不读取已有账号配置；可通过 Docker 强制断网。
-开发期的真实工具/MCP 验证属于历史证据，本次发布不重新发起 ChatGPT 生成，
-也不上传私有验收记录。运行示例会消耗模型用量；离线通过不等于上游额度恢复。
+On the clean web image, the completed addition-repair fixture took 50.375 seconds:
+2 completed shell items, 1 completed patch item, a successful CLI unittest command,
+unchanged tests, independently passing final tests, CLI exit 0 and `turn.completed`.
+A second clean coding fixture, `姓名 处理.py`, completed in 43.734 seconds with
+2 shell items, 1 patch, successful client unittest, unchanged tests and a completed
+CLI turn. It fixed boundary whitespace while preserving internal spaces.
+The clean stdio MCP fixture completed in 17.984 seconds with 1 real lookup and a
+matching randomized return value. These are individual completed runs, not latency
+benchmarks or a guarantee that every web request succeeds.
 
-2026-11-03 发布检查：从零构建镜像，13 个套件共 221 项离线回归通过；
-断网启动/HTTP 检查未产生生成请求；配置生成及防覆盖检查通过；实际执行了
-示例 MCP 的工具发现和调用，并核对固定版本 SDK 的构造与结果序列化。
+Earlier failed attempts remain failures, including TLS connection failures,
+nonconforming final envelopes and an unfinished upstream final message. Only the
+non-inference requirements endpoint permits one TLS-connect retry for Responses;
+audit metadata counts it separately. Generations are never automatically replayed.
+Web protocol, account state and network failures can still interrupt a client turn.
+The bridge is not native Codex inference and does not claim complete official API
+equivalence. Native Terra remains a separately selected route.
+
+## Regression and image checks
+
+**276 offline tests across 16 suites passed**, with Docker `--network none`.
+The final image was built successfully and tested independently of the source
+bind mount. Existing 221 tests remain included. Coverage includes:
+
+- Function/custom/namespace tools, exact patch strings, Unicode, schema/grammar
+  rejection, parallel and out-of-order result associations.
+- Actual loopback HTTP/WebSocket transport, authenticated model metadata,
+  generation-free warmup, full-context replay, idempotency and local GET/DELETE.
+- Owner isolation, encrypted checkpoints, expired state, compaction boundaries,
+  native opaque state preservation, and no fallback generation after failure.
+- Live final-text timing, explicit rewrite failures, typed terminal events,
+  deadlines/disconnects, logical SSE failure audits, quota and safe error metadata.
+- Explicit final/call frames, presentation markers, custom-input preservation,
+  prepared connection-pool reuse, and strictly bounded preflight-only TLS retry.
+
+Run `python scripts/test.py` from the repository root. Suites run in separate
+processes and temporary working directories. The runner ignores project dotenv
+and inherited Responses credentials/state settings. It does not open the
+operator's account pool. Live tests are opt-in and are never run by CI.
+
+Real acceptance also found and fixed Codex's nullable patch-line grammar dialect,
+reordered web input echoes, premature validation of intermediate tool text,
+terminal-disconnect audit classification, and WS warmups that must not reach
+inference. Private credentials, raw model streams/reasoning, signed URLs and local
+acceptance logs are excluded from Git and the image build context.
+
+Known `usage_limit` and authentication failures remain failures. An HTTP 200 model
+catalog proves discovery, not generation access. No test claims quota recovery,
+complete equivalence to every official API feature, or remote cancellation.
+
+## 中文说明
+
+本轮真实 CLI 为 `0.166.0-alpha.5.1`。原生 `gpt-6.1-terra` 已通过实际改代码、
+运行测试、stdio/HTTP MCP、app-server 两轮、续接、原生压缩后续接及 WebSocket
+应答。编程用例实际执行 4 个命令、1 次补丁，测试文件未改，测试由失败变为通过。
+
+网页 `gpt-6-thinking` + High 已在无诊断注入、无源码挂载的独立镜像上通过真实
+CLI 编程验收：2 个 Shell 命令、1 次补丁、客户端运行 unittest 成功，测试文件
+未改，独立复测通过，CLI 正常结束。中文且含空格的文件名用例也通过相同标准，
+实际 stdio MCP 随机值调用与回传通过。
+基线失败和中途失败均保留；网页成功独立验证，未使用原生路径替代。
+网页压缩仍为网关摘要，与原生加密推理状态不同。
+
+16 个套件共 276 项断网回归通过。离线测试不读取已有账号池及私有 `.env`，
+真实模型测试需主动运行并消耗用量，CI 不触发真实推理。一次性客户端目录排除
+无关技能、插件和继承的桌面工具管道，不修改全局配置。网页仍可能返回不合协议
+或未完成的响应；这些请求明确失败，不靠重发生成或提取思考消息伪装为成功。

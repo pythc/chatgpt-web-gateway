@@ -137,13 +137,33 @@ def record_upstream_model(service, message):
 
 
 async def stream_response(service, response, model, max_tokens):
-    from chatgpt.webStream import ConversationState, events, protocol_error
+    from chatgpt.webStream import ConversationState, events, protocol_error, text_parts
     from chatgpt import errorObservation as observation
     state = ConversationState(service)
     service.lifecycle_state = state
+    live = bool(getattr(service, 'responses_live', False))
+    delivered = ''
+    live_base = {'id': 'chatcmpl-' + uuid.uuid4().hex, 'object': 'chat.completion.chunk',
+                 'created': int(time.time()), 'model': model}
+    def live_frame(delta):
+        return 'data: ' + json.dumps({**live_base, 'choices': [{'index': 0, 'delta': delta,
+                'logprobs': None, 'finish_reason': None}]}, ensure_ascii=False) + '\n\n'
     try:
+        if live:yield live_frame({'role': 'assistant', 'content': ''})
         async for event in events(response):
             state.feed(event)
+            if live and state.user_seen:
+                message = state.messages.get(state.last_assistant_id, {})
+                if state.visible(message) and message.get('channel') == 'final':
+                    pending = text_parts(message.get('content'))
+                    try:pending.encode('utf-8')
+                    except UnicodeEncodeError:continue
+                    pending, _, _ = await split_tokens_from_content(pending, max_tokens, model)
+                    if not pending.startswith(delivered):
+                        protocol_error('upstream_text_rewritten', 'Upstream rewrote text already delivered; response cannot complete successfully')
+                    if len(pending) > len(delivered):
+                        yield live_frame({'content': pending[len(delivered):]})
+                        delivered = pending
             if event == "[DONE]":break
         state.transport_observation["initial_sse_exited_ms"] = state.observation_ms()
         bootstrap = state.checkpoint()
@@ -177,14 +197,17 @@ async def stream_response(service, response, model, max_tokens):
         except UnicodeEncodeError:
             protocol_error("invalid_upstream_unicode", "Final answer contains an incomplete Unicode character")
         content, _, local_reason = await split_tokens_from_content(text, max_tokens, service.upstream_model or model)
+        if live and not content.startswith(delivered):
+            protocol_error('upstream_text_rewritten', 'Final text differs from the committed stream prefix')
         if local_reason == "length":reason = "length"
         base = {"id": "chatcmpl-" + uuid.uuid4().hex, "object": "chat.completion.chunk", "created": int(time.time()),
                 "model": service.upstream_model or model, "lifecycle": state.summary()}
         if service.upstream_thinking_effort is not None:base["thinking_effort"] = service.upstream_thinking_effort
         def frame(delta, finish=None):
             return "data: " + json.dumps({**base, "choices": [{"index": 0, "delta": delta, "logprobs": None, "finish_reason": finish}]}, ensure_ascii=False) + "\n\n"
-        yield frame({"role": "assistant", "content": ""})
-        for offset in range(0, len(content), 512):yield frame({"content": content[offset:offset+512]})
+        if not live:yield frame({"role": "assistant", "content": ""})
+        remaining = content[len(delivered):] if live else content
+        for offset in range(0, len(remaining), 512):yield frame({"content": remaining[offset:offset+512]})
         yield frame({}, reason)
         yield "data: [DONE]\n\n"
     except HTTPException as error:

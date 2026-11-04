@@ -53,6 +53,40 @@ def envelope_text(text):
     return text
 
 
+def response_frame(text, nonce):
+    """Read an explicitly delimited current-turn frame, never a JSON substring."""
+    wire = envelope_text(text)
+    # A complete bare object remains valid even if its string data mentions
+    # marker names. completion() still validates the entire JSON and nonce.
+    if wire.startswith('{'):
+        return wire
+    if 'BEGIN_CLIENT_RESPONSE' not in wire and 'END_CLIENT_RESPONSE' not in wire:
+        return wire
+    begin, end = 'BEGIN_CLIENT_RESPONSE ' + nonce, 'END_CLIENT_RESPONSE ' + nonce
+    lines = wire.splitlines(keepends=True)
+    def marker(line, value):
+        # ChatGPT may decorate either marker line separately, including with
+        # an unmatched escape token. Match only a literal current-turn marker.
+        return re.fullmatch(r'(?:</?escape>){0,4}' + re.escape(value) +
+                            r'(?:</?escape>){0,4}', line.strip()) is not None
+    starts = [i for i, line in enumerate(lines) if marker(line, begin)]
+    ends = [i for i, line in enumerate(lines) if marker(line, end)]
+    if len(starts) != 1 or len(ends) != 1 or starts[0] >= ends[0]:
+        raise ValueError('Missing or ambiguous response frame')
+    prefix = ''.join(lines[:starts[0]])
+    suffix = ''.join(lines[ends[0] + 1:])
+    if (len(prefix) > 4096 or suffix.strip() or
+            'BEGIN_CLIENT_RESPONSE' in prefix or 'END_CLIENT_RESPONSE' in prefix):
+        raise ValueError('Invalid response frame boundary')
+    payload = envelope_text(''.join(lines[starts[0] + 1:ends[0]]))
+    # The web renderer can leave an unmatched presentation escape token.
+    # Only the complete current-turn outer frame permits removing it; the
+    # remaining payload must still be one complete, schema-valid JSON object.
+    payload = re.sub(r'^(?:</?escape>){1,4}', '', payload).strip()
+    payload = re.sub(r'(?:</?escape>){1,4}$', '', payload).strip()
+    return payload
+
+
 def local_refs_only(value):
     if isinstance(value, dict):
         for key, child in value.items():
@@ -78,6 +112,7 @@ class ClientToolBridge:
     def __init__(self, data):
         self.data = data
         self.nonce = "bridge_" + uuid.uuid4().hex
+        self.final_envelope = False
         self.schemas = {}
         if "functions" in data or "function_call" in data:
             fail(400, "unsupported_legacy_functions", "Use tools and tool_choice instead of legacy functions")
@@ -197,20 +232,37 @@ class ClientToolBridge:
             fail(400, "missing_tool_results", "Unresolved assistant tool calls require role=tool results")
         return converted
 
-    def upstream_request(self):
+    def upstream_request(self, final_envelope=False):
+        self.final_envelope = bool(final_envelope and self.choice != 'none')
         protocol = {
             "bridge": self.nonce, "tool_choice": self.choice,
             "forced_function": self.forced, "parallel_tool_calls": self.parallel,
             "tools": self.tools,
             "call_response": {"bridge": self.nonce, "kind": "tool_calls", "calls": [{"name": "declared_function_name", "arguments": {}}]},
         }
+        if final_envelope:
+            protocol['final_response'] = {'bridge': self.nonce, 'kind': 'final', 'content': 'user-facing final answer'}
+            protocol['response_frame'] = {'begin': 'BEGIN_CLIENT_RESPONSE ' + self.nonce,
+                                          'end': 'END_CLIENT_RESPONSE ' + self.nonce}
+        call_instruction = (
+            'When a function is needed, put the call_response JSON object inside the response_frame; '
+            'the client executes the calls. Use exact declared names and arguments satisfying their JSON '
+            'Schemas. Put no narration or markdown fences inside that frame. '
+            if final_envelope else
+            'When a function is needed, return ONLY the call_response JSON envelope; the client executes the calls. '
+            'Use exact declared names and arguments satisfying their JSON Schemas. No markdown fences or extra text. ')
+        final_instruction = (
+            'For a final answer, use the final_response JSON envelope. '
+            'Put exactly one call_response or final_response JSON object inside the response_frame: '
+            'the begin marker on its own line, then JSON, then the end marker on its own line. '
+            'Any brief progress update belongs before the begin marker; nothing may follow the end marker. '
+            'Put final prose inside final_response.content. '
+            if final_envelope else 'For a final answer, return ordinary user-facing text, not a bridge envelope. ')
         instruction = (
             "CLIENT FUNCTION PROTOCOL. You can request execution of the client functions listed below. "
             "They are available through this protocol even if they are not native ChatGPT tools. "
             "Do not execute them yourself, use native tools as a substitute, invent results, or say a listed function is unavailable. "
-            "When a function is needed, return ONLY the call_response JSON envelope; the client executes the calls. "
-            "Use exact declared names and arguments satisfying their JSON Schemas. No markdown fences or extra text. "
-            "For a final answer, return ordinary user-facing text, not a bridge envelope. "
+            + call_instruction + final_instruction +
             "If a reply was interrupted and a later message asks to continue its serialization, "
             "resume that same response from the specified boundary; do not create a new envelope or extra calls. "
             "With tool_choice=required you MUST request a function on this turn; forced_function restricts all calls to that name. "
@@ -240,7 +292,7 @@ class ClientToolBridge:
             return upstream
         try:
             text = upstream["choices"][0]["message"]["content"]
-            wire = envelope_text(text)
+            wire = response_frame(text, self.nonce) if self.final_envelope else envelope_text(text)
             protocol_candidate = self.nonce in text or (
                 bool(re.search(r'"bridge"\s*:', wire)) and
                 bool(re.search(r'"kind"\s*:\s*"(?:tool_calls|final)"', wire)))
@@ -252,7 +304,7 @@ class ClientToolBridge:
                 if upstream["choices"][0]["finish_reason"] == "length":
                     raise ValueError("truncated envelope")
                 envelope = parsed
-            elif self.choice == "auto" and not protocol_candidate:
+            elif self.choice == "auto" and not protocol_candidate and not self.final_envelope:
                 envelope = {"kind": "final", "content": text}
             else:
                 raise ValueError("invalid or required envelope")

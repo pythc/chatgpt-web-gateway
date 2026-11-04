@@ -78,7 +78,10 @@ class RequestObservation:
             if isinstance(state, ConversationState):
                 try:result["lifecycle"] = state.summary()
                 except Exception:pass
-        if status >= 400 and self.failure is not None:result["failure"] = dict(self.failure)
+        if self.service is not None and getattr(self.service, 'chat_requirements_connect_retries', 0) == 1:
+            result['preflight_connect_retries'] = 1
+        if (status >= 400 or result.get('response_status') == 'failed') and self.failure is not None:
+            result["failure"] = dict(self.failure)
         return result or None
 
 

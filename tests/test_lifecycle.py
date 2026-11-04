@@ -26,6 +26,24 @@ async def complete(s,*items):
     return await format_not_stream_response(stream_response(s,replay,'gpt-6-thinking',262144),1,262144,'gpt-6-thinking')
 
 class LifecycleTests(unittest.IsolatedAsyncioTestCase):
+    def test_misdirected_native_tool_metadata_is_bounded_and_not_executable_output(self):
+        state=ConversationState(service())
+        state.feed({'message':message('call','PRIVATE_TOOL_INPUT',channel='commentary',recipient='functions.exec')})
+        state.feed({'message':message('unknown','PRIVATE',channel='commentary',recipient='private-recipient')})
+        state.feed({'message':message('final','No client execution occurred.')})
+        summary=state.summary()
+        self.assertEqual(summary['upstream_tool_recipients'],{'functions.exec':1,'other':1})
+        self.assertNotIn('PRIVATE',json.dumps(summary));self.assertNotIn('private-recipient',json.dumps(summary))
+        self.assertEqual(state.candidate()[0]['id'],'final')
+    def test_supplied_history_echo_after_target_is_not_a_new_turn(self):
+        s = service();s.input_message_id = 'target';s.input_user_ids = ['prior', 'target']
+        state = ConversationState(s)
+        for mid in ('prior', 'target', 'prior', 'target'):
+            state.feed({'type': 'input_message', 'input_message': {'id': mid, 'author': {'role': 'user'}}})
+        self.assertTrue(state.user_seen)
+        with self.assertRaises(UpstreamError):
+            state.feed({'type': 'input_message', 'input_message': {'id': 'foreign', 'author': {'role': 'user'}}})
+
     async def test_first_terminal_or_nonempty_event_is_not_lost(self):
         for status in ('in_progress','finished_successfully'):
             s=service();items=[{'message':message(status=status)}]

@@ -1,6 +1,6 @@
 """No network: real ASGI route/middleware and service error wrappers, fake transports."""
 import asyncio,contextlib,io,json,logging,types,unittest,uuid
-from unittest.mock import AsyncMock,patch
+from unittest.mock import AsyncMock,Mock,patch
 logging.disable(logging.CRITICAL)
 with contextlib.redirect_stdout(io.StringIO()),contextlib.redirect_stderr(io.StringIO()):
     from app import app
@@ -60,6 +60,46 @@ class ErrorObservationTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(PRIVATE,json.dumps(records));self.assertNotIn(PRIVATE,response.text)
         self.assertIsNone(obs._current.get())
         return response,records[0]
+
+    async def test_responses_requirements_tls35_retries_only_preflight_once(self):
+        s=service();s.responses_request=True;s.lifecycle_budget=LifecycleBudget(5)
+        reply=types.SimpleNamespace(status_code=200,json=lambda:{'persona':'chatgpt-paid','token':'synthetic'})
+        real_requirements(s,reply);s.ss.post.side_effect=[CurlError(PRIVATE,35),reply]
+        token=await s.get_chat_requirements()
+        self.assertEqual(token,'synthetic');self.assertEqual(s.ss.post.await_count,2)
+        self.assertEqual(s.chat_requirements_connect_retries,1)
+        self.assertTrue(all(call.args[0].endswith('/sentinel/chat-requirements') for call in s.ss.post.await_args_list))
+        self.assertEqual(s.lifecycle_budget.generations,0);s.send_conversation.assert_not_awaited()
+        observation=obs.RequestObservation();observation.service=s
+        self.assertEqual(observation.trace({},200)['preflight_connect_retries'],1)
+
+    async def test_requirements_retry_excludes_legacy_other_errors_and_cancellation(self):
+        for responses,error in ((False,CurlError(PRIVATE,35)),(True,CurlError(PRIVATE,28)),
+                                (True,asyncio.CancelledError())):
+            with self.subTest(responses=responses,error=type(error).__name__):
+                s=service();s.responses_request=responses;s.lifecycle_budget=LifecycleBudget(5)
+                real_requirements(s,error)
+                expected=asyncio.CancelledError if isinstance(error,asyncio.CancelledError) else HTTPException
+                with self.assertRaises(expected):await s.get_chat_requirements()
+                self.assertEqual(s.ss.post.await_count,1);self.assertEqual(s.chat_requirements_connect_retries,0)
+                s.send_conversation.assert_not_awaited()
+
+    async def test_requirements_second_tls_failure_and_expired_budget_stop(self):
+        for expired in (False,True):
+            s=service();s.responses_request=True;s.lifecycle_budget=LifecycleBudget(5)
+            real_requirements(s,CurlError(PRIVATE,35))
+            if expired:s.lifecycle_budget.remaining=Mock(side_effect=[1,0])
+            with self.assertRaises(HTTPException):await s.get_chat_requirements()
+            self.assertEqual(s.ss.post.await_count,1 if expired else 2)
+            self.assertEqual(s.lifecycle_budget.generations,0);s.send_conversation.assert_not_awaited()
+
+    async def test_requirements_http_auth_quota_and_server_errors_are_not_retried(self):
+        for status in (401,403,429,500):
+            s=service();s.responses_request=True;s.lifecycle_budget=LifecycleBudget(5)
+            real_requirements(s,types.SimpleNamespace(status_code=status,headers={},text='synthetic failure'))
+            with self.assertRaises(HTTPException):await s.get_chat_requirements()
+            self.assertEqual(s.ss.post.await_count,1);self.assertEqual(s.chat_requirements_connect_retries,0)
+            s.send_conversation.assert_not_awaited()
 
     async def test_requirements_curl28_preserved_before_two_http500_wrappers(self):
         s=service();real_requirements(s,CurlError(PRIVATE,28))

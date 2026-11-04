@@ -83,6 +83,55 @@ class ClientToolTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(result['choices'][0]['finish_reason'],'stop')
             self.assertNotIn('tool_calls',result['choices'][0]['message'])
 
+    async def test_opt_in_final_envelope_round_trip_and_strict_whole_frame(self):
+        bridge=self.bridge();request=bridge.upstream_request(final_envelope=True)
+        self.assertIn('"final_response"',request['messages'][0]['content'])
+        result=await bridge.completion(self.response(bridge,kind='final',content='Verified 你好'))
+        self.assertEqual(result['choices'][0]['message']['content'],'Verified 你好')
+        self.assertEqual((await bridge.completion(self.response(bridge)))['choices'][0]['finish_reason'],'tool_calls')
+        for text in ('ordinary unframed final', 'Progress first\n<escape>'+json.dumps({
+            'bridge':bridge.nonce,'kind':'tool_calls','calls':[{'name':'lookup','arguments':{'key':'sample'}}]})+'</escape>'):
+            upstream=self.response(bridge);upstream['choices'][0]['message']['content']=text
+            with self.assertRaises(HTTPException):await bridge.completion(upstream)
+
+    async def test_disabled_tools_do_not_require_a_final_envelope(self):
+        bridge=self.bridge(tool_choice='none');bridge.upstream_request(final_envelope=True)
+        upstream=self.response(bridge);upstream['choices'][0]['message']['content']='Normal final'
+        result=await bridge.completion(upstream)
+        self.assertEqual(result['choices'][0]['message']['content'],'Normal final')
+
+    async def test_delimited_current_turn_frame_allows_progress_without_json_guessing(self):
+        bridge=self.bridge();bridge.upstream_request(final_envelope=True)
+        raw=self.response(bridge);wire=raw['choices'][0]['message']['content']
+        begin='BEGIN_CLIENT_RESPONSE '+bridge.nonce;end='END_CLIENT_RESPONSE '+bridge.nonce
+        for inner in (wire,'<escape>'+wire+'</escape>','<escape>'+wire,wire+'</escape>'):
+            upstream=copy.deepcopy(raw)
+            upstream['choices'][0]['message']['content']='Inspecting the remote fixture.\n\n'+begin+'\n'+inner+'\n'+end
+            result=await bridge.completion(upstream)
+            self.assertEqual(result['choices'][0]['finish_reason'],'tool_calls')
+            self.assertIsNone(result['choices'][0]['message']['content'])
+        upstream=copy.deepcopy(raw)
+        upstream['choices'][0]['message']['content']=begin+'\r\n'+wire+'\r\n'+end
+        self.assertEqual((await bridge.completion(upstream))['choices'][0]['finish_reason'],'tool_calls')
+        upstream=copy.deepcopy(raw)
+        upstream['choices'][0]['message']['content']='Progress.\n\n<escape>'+begin+'\n'+wire+'\n<escape>'+end+'</escape>'
+        self.assertEqual((await bridge.completion(upstream))['choices'][0]['finish_reason'],'tool_calls')
+        frames=(begin+'\n'+wire+'\n'+end+' trailing text',
+                begin+'\n'+wire, begin+'\n'+wire+'\nEND_CLIENT_RESPONSE wrong',
+                begin+'\n'+wire+'\n'+end+'\n'+begin+'\n'+wire+'\n'+end)
+        for text in frames:
+            upstream=copy.deepcopy(raw);upstream['choices'][0]['message']['content']=text
+            with self.assertRaises(HTTPException):await bridge.completion(upstream)
+
+    async def test_framed_payload_still_requires_declared_tools_and_valid_arguments(self):
+        bridge=self.bridge();bridge.upstream_request(final_envelope=True)
+        for calls in ([{'name':'undeclared','arguments':{}}],[{'name':'lookup','arguments':{'key':'invalid'}}]):
+            upstream=self.response(bridge,calls=calls);wire=upstream['choices'][0]['message']['content']
+            upstream['choices'][0]['message']['content']='BEGIN_CLIENT_RESPONSE '+bridge.nonce+'\n'+wire+'\nEND_CLIENT_RESPONSE '+bridge.nonce
+            with self.assertRaises(HTTPException):await bridge.completion(upstream)
+        upstream=self.response(bridge,kind='final',content='The literal BEGIN_CLIENT_RESPONSE appears in this answer.')
+        self.assertIn('BEGIN_CLIENT_RESPONSE',(await bridge.completion(upstream))['choices'][0]['message']['content'])
+
     async def test_auto_malformed_protocol_is_not_hidden_as_plain_text(self):
         bridge=self.bridge();upstream=self.response(bridge)
         upstream['choices'][0]['message']['content']='{"bridge":"'+bridge.nonce+'","kind":"tool_calls",'
