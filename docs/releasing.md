@@ -14,7 +14,7 @@ image digest when reproducibility matters.
 3. On the merged `main` commit, create and push an annotated `v<version>` tag.
    Do not move a published tag or reuse a version for a changed image.
 4. The tag workflow verifies the tag matches `version.txt` and belongs to `main`,
-   runs offline checks, builds both architectures, tests each published digest,
+   runs offline checks, builds both architectures, tests each published digest on its native architecture,
    then creates a GitHub prerelease with the digest and release-specific notes.
 5. On first publication, make the linked GHCR package public in its package
    settings; verify an anonymous pull. Public source does not guarantee public
@@ -31,7 +31,7 @@ image without a Release; do not advertise it as a qualified release. Inspect the
 failed step first. After an interrupted post-push qualification, dispatch the publication workflow
 from `main` with the existing tag and exact index digest. This recovery path
 verifies the tag still resolves to that digest, tests each architecture by its
-child manifest digest, and skips rebuilding/pushing. It must not replace an
+child manifest digest on native amd64/arm64 runners, and skips rebuilding/pushing. It must not replace an
 already published release. The workflow
 refuses to start publication if the GitHub Release already exists. If published
 content must change, use a new patch version. Never delete private runtime state
