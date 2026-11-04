@@ -92,7 +92,7 @@ with open('version.txt') as f:
     version = f.read().strip()
 
 logger.info("-" * 60)
-logger.info(f"Chat2Api {version} | https://github.com/lanqian528/chat2api")
+logger.info(f"ChatGPT Web Gateway {version} | https://github.com/pythc/chatgpt-web-gateway")
 logger.info("-" * 60)
 logger.info("Environment variables:")
 logger.info("------------------------- Security -------------------------")

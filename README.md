@@ -157,6 +157,20 @@ docker run --rm --network none --entrypoint python \
 
 See [validation](docs/validation.md) for local Python and opt-in live checks. Runtime configuration, account files, logs and local work notes belong outside version control.
 
+## Community
+
+Questions and ideas: [Discussions](https://github.com/pythc/chatgpt-web-gateway/discussions).
+Reproducible bugs and client results: [Issue forms](https://github.com/pythc/chatgpt-web-gateway/issues/new/choose).
+English and Chinese are welcome.
+
+[Contributing](CONTRIBUTING.md) · [Support](SUPPORT.md) ·
+[Code of Conduct](CODE_OF_CONDUCT.md) · [Security](SECURITY.md) ·
+[Client compatibility](docs/compatibility.md) · [Changelog](CHANGELOG.md) ·
+[Releases and rollback](docs/releasing.md) · [Demo walkthrough](docs/demo.md)
+
+The public roadmap lives in [Milestones](https://github.com/pythc/chatgpt-web-gateway/milestones).
+0.x versions are previews; compatibility is versioned and backend-specific.
+
 ## License
 
 [MIT](LICENSE) · Derived from [lanqian528/chat2api](https://github.com/lanqian528/chat2api), with attribution in [NOTICE](NOTICE). An independent community project, unaffiliated with OpenAI.

@@ -1,0 +1,51 @@
+name: Client compatibility / 客户端兼容性
+description: Share a versioned result, including failures and untested flows.
+title: "[Compatibility]: "
+labels: [compatibility, needs-triage]
+body:
+  - type: input
+    id: versions
+    attributes:
+      label: Gateway version/digest and exact client version
+    validations:
+      required: true
+  - type: input
+    id: date
+    attributes:
+      label: Test date, OS and architecture
+    validations:
+      required: true
+  - type: dropdown
+    id: backend
+    attributes:
+      label: Backend
+      options: [Web, Native, Synthetic]
+    validations:
+      required: true
+  - type: input
+    id: flow
+    attributes:
+      label: Model/effort, flow, tools and transport
+    validations:
+      required: true
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: Outcome
+      options: [Live passed, Live failed, Offline checked, Untested, Unsupported]
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Synthetic reproduction and safe evidence
+      description: Show terminal outcome and actual tool execution where applicable. Do not paste credentials, account files, raw model output or signed URLs.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Evidence boundaries
+      options:
+        - label: I distinguish actual model execution from offline checks and have removed private data.
+          required: true
