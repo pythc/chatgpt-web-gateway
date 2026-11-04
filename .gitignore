@@ -18,3 +18,8 @@ htmlcov/
 dist/
 build/
 *.egg-info/
+
+# Local work notes
+TODO.md
+TASKS.md
+PLAN.md

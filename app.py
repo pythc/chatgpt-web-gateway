@@ -46,7 +46,6 @@ if enable_gateway:
     import gateway.login
     import gateway.chatgpt
     import gateway.gpts
-    import gateway.admin
     import gateway.v1
     import gateway.backend
 else:
