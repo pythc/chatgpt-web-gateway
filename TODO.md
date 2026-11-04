@@ -49,3 +49,22 @@ Final acceptance and remaining web protocol boundaries: [validation.md](docs/val
 - [x] Pass a second coding fixture with a Chinese filename containing a space.
 - [x] Update bilingual evidence and document remaining protocol/network boundaries.
 - [x] Publish the reviewed fix and verify GitHub CI.
+
+## File-based deployment cleanup
+
+- [x] Verify that the local account form is a real credential-management route.
+- [x] Remove the account HTML and legacy HTTP credential/seed-management routes.
+- [x] Support operator-managed token files and session JSON without rewriting them.
+- [x] Make manual .env configuration the default English-first deployment flow.
+- [x] Complete regression, fresh Compose startup and local deployment checks.
+- [ ] Publish the configuration cleanup and verify CI.
+
+## Additional live web qualification
+
+These are remaining validation gaps, not confirmed defects or missing protocol
+implementations. They were not covered by the completed web coding/stdio-MCP runs.
+
+- [ ] Client-side Streamable HTTP MCP on the web backend.
+- [ ] Real web app-server thread/start and follow-up turn.
+- [ ] Real web previous_response_id continuation.
+- [ ] Real CLI WebSocket response on the web backend.

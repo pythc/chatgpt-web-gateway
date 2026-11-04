@@ -3,9 +3,10 @@ import os
 
 import utils.configs as configs
 from utils.Logger import logger
+from utils.credentials import read_token_file
 
 DATA_FOLDER = "data"
-TOKENS_FILE = os.path.join(DATA_FOLDER, "token.txt")
+TOKENS_FILE = os.environ.get('CHATGPT_TOKEN_FILE') or os.path.join(DATA_FOLDER, "token.txt")
 REFRESH_MAP_FILE = os.path.join(DATA_FOLDER, "refresh_map.json")
 ERROR_TOKENS_FILE = os.path.join(DATA_FOLDER, "error_token.txt")
 WSS_MAP_FILE = os.path.join(DATA_FOLDER, "wss_map.json")
@@ -85,13 +86,9 @@ else:
     conversation_map = {}
 
 if os.path.exists(TOKENS_FILE):
-    with open(TOKENS_FILE, "r", encoding="utf-8") as f:
-        for line in f:
-            if line.strip() and not line.startswith("#"):
-                token_list.append(line.strip())
-else:
-    with open(TOKENS_FILE, "w", encoding="utf-8") as f:
-        pass
+    token_list = read_token_file(TOKENS_FILE)
+elif os.environ.get('CHATGPT_TOKEN_FILE'):
+    raise FileNotFoundError('Configured CHATGPT_TOKEN_FILE does not exist; mount a credential file before starting')
 
 if os.path.exists(ERROR_TOKENS_FILE):
     with open(ERROR_TOKENS_FILE, "r", encoding="utf-8") as f:

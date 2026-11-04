@@ -57,9 +57,22 @@ Web protocol, account state and network failures can still interrupt a client tu
 The bridge is not native Codex inference and does not claim complete official API
 equivalence. Native Terra remains a separately selected route.
 
+## File-based deployment checks
+
+The account setup page and legacy management routes have been removed. A fresh
+Compose project using a synthetic session-JSON credential file started successfully,
+served the English API metadata, and returned 404 for the old account routes. The
+credential file remained unchanged. This startup check did not access a real account.
+Both existing local instances were also upgraded with their original environment,
+credential mounts and data preserved; the previous images remain available for rollback.
+
+The independent image regression exposed a missing public `.env.example` template
+in the build context; the template is now included while private `.env` and runtime
+files remain excluded. The final image passed all 282 tests with networking disabled.
+
 ## Regression and image checks
 
-**276 offline tests across 16 suites passed**, with Docker `--network none`.
+**282 offline tests across 17 suites passed**, with Docker `--network none`.
 The final image was built successfully and tested independently of the source
 bind mount. Existing 221 tests remain included. Coverage includes:
 
@@ -71,6 +84,8 @@ bind mount. Existing 221 tests remain included. Coverage includes:
   native opaque state preservation, and no fallback generation after failure.
 - Live final-text timing, explicit rewrite failures, typed terminal events,
   deadlines/disconnects, logical SSE failure audits, quota and safe error metadata.
+- File-based credentials, session JSON and long values, read-only input, startup
+  errors without credential contents, and removed account-management HTTP routes.
 - Explicit final/call frames, presentation markers, custom-input preservation,
   prepared connection-pool reuse, and strictly bounded preflight-only TLS retry.
 
@@ -102,7 +117,7 @@ CLI 编程验收：2 个 Shell 命令、1 次补丁、客户端运行 unittest �
 基线失败和中途失败均保留；网页成功独立验证，未使用原生路径替代。
 网页压缩仍为网关摘要，与原生加密推理状态不同。
 
-16 个套件共 276 项断网回归通过。离线测试不读取已有账号池及私有 `.env`，
+17 个套件共 282 项断网回归通过。离线测试不读取已有账号池及私有 `.env`，
 真实模型测试需主动运行并消耗用量，CI 不触发真实推理。一次性客户端目录排除
 无关技能、插件和继承的桌面工具管道，不修改全局配置。网页仍可能返回不合协议
 或未完成的响应；这些请求明确失败，不靠重发生成或提取思考消息伪装为成功。

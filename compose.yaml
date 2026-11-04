@@ -3,13 +3,15 @@ services:
     build: .
     image: chatgpt-web-gateway:local
     restart: unless-stopped
+    # A single API container does not need a new per-project Docker network.
+    network_mode: bridge
     ports:
       - "127.0.0.1:5005:5005"
     env_file:
       - .env
     environment:
-      API_PREFIX: ${API_PREFIX:?Run python3 scripts/configure.py first}
-      AUTHORIZATION: ${AUTHORIZATION:?Run python3 scripts/configure.py first}
+      API_PREFIX: ${API_PREFIX:?Set API_PREFIX in .env}
+      AUTHORIZATION: ${AUTHORIZATION:?Set AUTHORIZATION in .env}
     volumes:
       - ./data:/app/data
     extra_hosts:

@@ -18,6 +18,8 @@ log_config["formatters"]["default"]["fmt"] = default_format
 log_config["formatters"]["access"]["fmt"] = access_format
 
 app = FastAPI(
+    title="ChatGPT Web Gateway",
+    description="OpenAI-compatible Chat Completions and Responses API. Configure accounts using local credential files.",
     docs_url=f"/{api_prefix}/docs",    # 设置 Swagger UI 文档路径
     redoc_url=f"/{api_prefix}/redoc",  # 设置 Redoc 文档路径
     openapi_url=f"/{api_prefix}/openapi.json"  # 设置 OpenAPI JSON 路径

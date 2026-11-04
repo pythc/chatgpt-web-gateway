@@ -21,20 +21,32 @@
 
 ## 快速开始
 
-需要 Docker Compose，以及用于生成本地配置的 Python 3。
+需要 Docker Compose。使用配置文件部署，无需账号录入页面。
 
 ```bash
 git clone https://github.com/pythc/chatgpt-web-gateway.git
 cd chatgpt-web-gateway
-python3 scripts/configure.py
+cp .env.example .env
+mkdir -p data
+touch data/token.txt
+chmod 700 data
+chmod 600 .env data/token.txt
+```
+
+1. 编辑 `.env`：将 `API_PREFIX` 改为自己的路径前缀（例如 `gateway`），将
+   `AUTHORIZATION` 改为自己的随机客户端 API Key，按需调整模型和代理。
+2. 编辑 `data/token.txt`：填写单行 ChatGPT access token，或包含 `accessToken`
+   的完整会话 JSON。多账号可使用每行一个 token，或 token 字符串的 JSON 数组。
+3. 启动服务：
+
+```bash
 docker compose up -d --build
 ```
 
-配置脚本在本机 `.env` 中生成随机客户端 API Key 和 URL 前缀，文件权限为 `0600`，不覆盖已有配置，也不打印凭证。
+也可用 `python3 scripts/configure.py` 代替复制步骤，生成带随机前缀和客户端密钥的
+私有 `.env`。脚本不覆盖已有 `.env`，不打印凭证；启动前仍需填写凭证文件。
 
-1. 从本地 `.env` 读取 `API_PREFIX`，访问 `http://127.0.0.1:5005/<API_PREFIX>/tokens`。
-2. 在密码输入框中粘贴你自己的 ChatGPT access token，或包含 `accessToken` 的会话 JSON，保存到本机。
-3. 配置 API 客户端：
+配置 API 客户端：
 
 | 配置项 | 值 |
 | --- | --- |
@@ -42,9 +54,14 @@ docker compose up -d --build
 | API Key | 本地 `.env` 的 `AUTHORIZATION` |
 | Model | `/v1/models` 返回的准确模型 ID |
 
-客户端 API Key 和 ChatGPT 登录 Token 是不同的凭证。登录 Token 留在网关端。`.env`、`data/`、日志和本地诊断材料均不进入 Git 或 Docker 构建上下文。
+客户端 API Key 与 ChatGPT 登录 token 是两套凭证。登录 token 只保留在网关端。
+`.env`、`data/`、日志和本地诊断材料不进入 Git 或镜像。凭证启动时读取；修改后运行
+`docker compose restart gateway`。如修改 `.env`，需运行
+`docker compose up -d --force-recreate gateway` 以更新容器环境。
 
-Compose 仅监听 `127.0.0.1`。继承的账号管理路由使用 URL 前缀，没有独立管理员认证，请保持本机访问。
+服务以 API 为主，仅监听本机。旧 `/tokens*` 账号页面及管理接口已移除，已有
+`data/token.txt` 可继续使用。自定义凭证路径、原生后端及升级方式见
+[配置说明](docs/configuration.md)。默认 README 和配置文档使用英文。
 
 如网络需要代理，在 `.env` 中设置 `PROXY_URL`。Docker Desktop 可使用 `http://host.docker.internal:7897` 这类地址访问宿主机代理，端口请换成自己的；默认不设置代理。
 
@@ -150,6 +167,7 @@ MCP tools/list → OpenAI tools → 模型 tool_calls
 
 | 环境变量 | 示例值 | 含义 |
 | --- | --- | --- |
+| `CHATGPT_TOKEN_FILE` | `data/token.txt` | 容器内的凭证文件路径 |
 | `DEFAULT_MODEL` | `gpt-6-thinking` | 默认请求模型 |
 | `DEFAULT_REASONING_EFFORT` | `high` | 默认模型的推理强度 |
 | `HISTORY_DISABLED` | `true` | 临时网页会话 |

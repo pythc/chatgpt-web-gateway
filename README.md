@@ -2,7 +2,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-Turn a ChatGPT web session into an **OpenAI-compatible Chat Completions and Codex Responses endpoints**, with **function calling, client-side MCP tools, and streaming responses**.
+Turn a ChatGPT web session into **OpenAI-compatible Chat Completions and Codex Responses endpoints**, with **function calling, client-side MCP tools, and streaming responses**.
 
 Use the standard OpenAI SDK workflow: declare `tools`, receive `tool_calls`, execute them in your client, and send results back as `role: "tool"`. Existing clients that implement this Chat Completions tool loop can use the gateway by changing their base URL and API key, within the compatibility scope below.
 
@@ -21,20 +21,34 @@ Derived from [lanqian528/chat2api](https://github.com/lanqian528/chat2api), with
 
 ## Quick start
 
-Requires Docker with Compose and Python 3 for generating the local configuration.
+Requires Docker with Compose. Configuration is file-based; no account setup page is required.
 
 ```bash
 git clone https://github.com/pythc/chatgpt-web-gateway.git
 cd chatgpt-web-gateway
-python3 scripts/configure.py
+cp .env.example .env
+mkdir -p data
+touch data/token.txt
+chmod 700 data
+chmod 600 .env data/token.txt
+```
+
+1. Edit `.env`: replace `API_PREFIX` with a URL prefix such as `gateway`, and set
+   `AUTHORIZATION` to your own random client API key. Adjust the model and proxy if needed.
+2. Edit `data/token.txt`: put your ChatGPT access token on one line, or paste the
+   complete session JSON containing `accessToken`. For multiple accounts, use one
+   token per line or a JSON array of token strings.
+3. Start the service:
+
+```bash
 docker compose up -d --build
 ```
 
-The configuration generator creates a random client API key and URL prefix in a local `.env` file with mode `0600`. It does not overwrite an existing configuration or print credentials.
+Alternatively, `python3 scripts/configure.py` generates a private `.env` with a
+random prefix and client key instead of the copy step. It never overwrites an
+existing `.env` or prints credentials. Add the credential file before starting.
 
-1. Read `API_PREFIX` from your local `.env` and open `http://127.0.0.1:5005/<API_PREFIX>/tokens`.
-2. Paste your own ChatGPT access token, or session JSON containing `accessToken`, into the password field and save it locally.
-3. Configure your API client:
+Configure your API client:
 
 | Setting | Value |
 | --- | --- |
@@ -42,9 +56,16 @@ The configuration generator creates a random client API key and URL prefix in a 
 | API key | `AUTHORIZATION` from your `.env` |
 | Model | An exact model ID returned by `/v1/models` |
 
-The client API key and ChatGPT login token are different credentials. Keep the login token on the gateway. `.env`, `data/`, logs, and local diagnostic artifacts are excluded from Git and Docker build contexts.
+The client API key and ChatGPT login token are different credentials. Keep the
+login token on the gateway. `.env`, `data/`, logs, and local diagnostics are excluded
+from Git and Docker build contexts. Credentials are read at startup; after editing
+the file, run `docker compose restart gateway`. After changing `.env`, run
+`docker compose up -d --force-recreate gateway` so the environment is refreshed.
 
-Compose publishes only to `127.0.0.1`. The inherited account-management routes use the URL prefix and do not have separate administrator authentication; keep them local.
+The service is API-first and publishes only to `127.0.0.1`. The former `/tokens*`
+account-management page and endpoints have been removed. Existing `data/token.txt`
+files remain supported. See [configuration and upgrade notes](docs/configuration.md)
+for custom credential paths, native-only setup and migration.
 
 If your network requires a proxy, set `PROXY_URL` in `.env`. From Docker Desktop, a host proxy can be reached using an address such as `http://host.docker.internal:7897`; replace the port with your own. No proxy is configured by default.
 
@@ -150,6 +171,7 @@ The sample configuration selects `gpt-6-thinking` with `high` effort. This is a 
 
 | Environment variable | Sample value | Meaning |
 | --- | --- | --- |
+| `CHATGPT_TOKEN_FILE` | `data/token.txt` | Credential file path inside the container |
 | `DEFAULT_MODEL` | `gpt-6-thinking` | Default requested model |
 | `DEFAULT_REASONING_EFFORT` | `high` | Effort for the default model |
 | `HISTORY_DISABLED` | `true` | Temporary web conversations |
