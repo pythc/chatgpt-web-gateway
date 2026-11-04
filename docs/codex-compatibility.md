@@ -113,6 +113,29 @@ python scripts/codex_acceptance.py --case mcp \
   --output diagnostics/mcp.json
 ```
 
+For the additional web checks, use a quiet, isolated local web instance and its
+host-side lifecycle audit file. Set `RESPONSES_WEBSOCKET_ENABLED=true` on that
+instance before the WebSocket check. This suite verifies the actual backend and
+model from server audit entries; WebSocket acceptance rejects HTTP fallback and
+requires every observed warmup to have zero generation POSTs.
+
+```sh
+python scripts/web_qualification.py --case http-mcp \
+  --mcp-python /absolute/path/to/python-with-example-dependencies \
+  --audit-file data/lifecycle-audit.jsonl --output diagnostics/web-http-mcp.json
+python scripts/web_qualification.py --case app-server \
+  --audit-file data/lifecycle-audit.jsonl --output diagnostics/web-app-server.json
+python scripts/web_qualification.py --case previous-response \
+  --audit-file data/lifecycle-audit.jsonl --output diagnostics/web-previous.json
+python scripts/web_qualification.py --case websocket \
+  --audit-file data/lifecycle-audit.jsonl --output diagnostics/web-websocket.json
+```
+
+Check each result before starting the next case. Use a fresh output name for a
+new intentional run. Failed/unknown runs are not automatically replayed. The
+app-server fixture uses one ephemeral thread and two turns; response-ID testing
+uses gateway RAM replay with `store=false`, not native hidden-reasoning state.
+
 See [validation evidence](validation.md) for exactly which real routes passed.
 Offline protocol success alone does not establish live model availability.
 

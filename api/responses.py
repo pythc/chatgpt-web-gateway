@@ -259,15 +259,21 @@ async def events(data, credentials, request, caller, idempotency):
             yield writer.frame('response.in_progress', response=response)
             async for event in web_events(data, credentials, budget, response, writer):
                 if '\ndata: ' in event:
-                    kind = json.loads(event.split('\ndata: ', 1)[1]).get('type')
+                    decoded = json.loads(event.split('\ndata: ', 1)[1])
+                    kind = decoded.get('type')
                     metrics.setdefault('first_event_ms', round((time.monotonic() - began) * 1000, 3))
                     if kind == 'response.output_text.delta':metrics.setdefault('first_text_ms', round((time.monotonic() - began) * 1000, 3))
                     if kind == 'response.output_item.done':
                         metrics.setdefault('first_item_done_ms', round((time.monotonic() - began) * 1000, 3))
-                        item = json.loads(event.split('\ndata: ', 1)[1]).get('item', {})
+                        item = decoded.get('item', {})
                         metrics['tool_calls_out'] += item.get('type') in ('function_call', 'custom_tool_call')
                     if kind in ('response.completed', 'response.incomplete'):
                         commit(response)
+                        # web_events serialized before commit added storage
+                        # metadata. Deliver the exact committed state on the
+                        # first response, including HTTP JSON and WebSocket.
+                        decoded['response'] = response
+                        event = writer.encode(decoded)
                 yield event
             completed = response['status'] in ('completed', 'incomplete')
         else:

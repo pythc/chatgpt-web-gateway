@@ -31,7 +31,7 @@ tokens, local account files, request bodies, raw reasoning, or private diagnosti
 - Native `previous_response_id`, V2 compaction, and post-compaction continuation passed.
 - Web `gpt-6-thinking`: real CLI hello passed after fixing repeated historical user
   echoes. Real stdio MCP passed. Web-only coding now passed on a clean image: 2 shell commands, 1 patch, client unittest, unchanged tests, and a completed turn; native success does not replace it.
-- 276 offline tests across 16 suites passed, including actual loopback HTTP/WS,
+- 288 offline tests across 18 suites passed, including actual loopback HTTP/WS,
   ownership, replay, compaction boundaries, grammars, streaming, and disconnects.
 - Item 8 covers integration/examples; live app-server and web MCP checks are tracked
   under item 10. MCP OAuth/HTTP authentication is handled by the Codex client.
@@ -62,10 +62,11 @@ Final acceptance and remaining web protocol boundaries: [validation.md](docs/val
 
 ## Additional live web qualification
 
-These are remaining validation gaps, not confirmed defects or missing protocol
-implementations. They were not covered by the completed web coding/stdio-MCP runs.
+Completed with real gpt-6-thinking + High on an independent web image. The suite
+checks execution receipts, exact randomized follow-ups and server transport audits.
+Earlier failed attempts remain recorded separately.
 
-- [ ] Client-side Streamable HTTP MCP on the web backend.
-- [ ] Real web app-server thread/start and follow-up turn.
-- [ ] Real web previous_response_id continuation.
-- [ ] Real CLI WebSocket response on the web backend.
+- [x] Client-side Streamable HTTP MCP on the web backend.
+- [x] Real web app-server thread/start and follow-up turn.
+- [x] Real web previous_response_id continuation.
+- [x] Real CLI WebSocket response on the web backend.

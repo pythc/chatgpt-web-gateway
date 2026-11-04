@@ -98,6 +98,16 @@ python scripts/codex_acceptance.py --case mcp \
 各条真实路由的验证结果见[验收记录](validation.md)。离线协议测试通过不代表当前
 上游模型可用，也不代表网页后端与原生 Codex API 在全部能力上完全等价。
 
+四项网页专项使用 `scripts/web_qualification.py`：`--case http-mcp`、`app-server`、
+`previous-response`、`websocket`。同时传入 `--audit-file`（独立实例的本机生命周期
+日志路径）及每次唯一的 `--output`；HTTP MCP 另需 `--mcp-python`。
+WebSocket 测试前需在实例上设置 `RESPONSES_WEBSOCKET_ENABLED=true`。
+完整命令见[英文配置说明](codex-compatibility.md#mcp-and-acceptance)。
+
+该脚本逐项校验真实后端和模型；WS 不允许 HTTP 回退，预热必须零推理。
+app-server 使用同一临时线程的两轮对话；响应 ID 测试使用 `store=false` 的网关
+RAM 重放，不冒充原生推理状态。逐项检查结果再继续；失败或未知结果不自动重发。
+
 ## 升级与回滚
 
 保留私有 `.env`、`data/`、原生登录只读挂载和旧镜像摘要。先构建新镜像，再替换

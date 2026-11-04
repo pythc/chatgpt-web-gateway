@@ -214,6 +214,25 @@ class NativeCompactionTests(unittest.IsolatedAsyncioTestCase):
 
 
 class StreamingTests(unittest.IsolatedAsyncioTestCase):
+    async def test_web_terminal_matches_committed_state_and_preserves_sequence(self):
+        from chatgpt.webStream import LifecycleBudget
+        for terminal in ('completed', 'incomplete'):
+            for stored in (False, True):
+                state=ResponseState(secret='synthetic')
+                async def web(data, credentials, budget, response, writer):
+                    response.update(status=terminal,output=[])
+                    yield writer.frame('response.'+terminal,response=response)
+                req=types.SimpleNamespace(state=types.SimpleNamespace(lifecycle_budget=LifecycleBudget(1)))
+                credentials=types.SimpleNamespace(credentials='synthetic')
+                with patch.object(endpoint,'STATE',state),patch.object(endpoint,'backend_mode',return_value='web'),patch.object(endpoint,'web_events',web):
+                    frames=[frame async for frame in endpoint.events({'model':'synthetic','input':[], 'store':stored},credentials,req,'owner',None)]
+                events=[json.loads(frame.split('\ndata: ',1)[1]) for frame in frames if '\ndata: ' in frame]
+                result=events[-1]['response']
+                self.assertEqual(result['store'],stored)
+                self.assertIs(result.get('gateway_upstream_store'),False)
+                self.assertEqual(result,state.get('owner',result['id'])['response'])
+                self.assertEqual([event['sequence_number'] for event in events],list(range(len(events))))
+
     async def test_framed_tool_output_is_never_streamed_as_plain_text(self):
         from chatgpt.webStream import LifecycleBudget
         payload={}
