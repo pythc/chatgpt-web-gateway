@@ -185,7 +185,9 @@ class ErrorObservationTests(unittest.IsolatedAsyncioTestCase):
             s.lifecycle_state=ConversationState(s);s.lifecycle_state.websocket_attempts=[{'connection':1,'outcome':'waiting'}]
             await asyncio.Event().wait()
         s.get_chat_requirements=wait
-        response,row=await self.post(lambda _:s,{'messages':[{'role':'user','content':'fixture'}],'auto_continue':True},.02)
+        # Exercise cancellation after the fake generation has started, rather
+        # than a 20 ms setup deadline that can expire on loaded CI workers.
+        response,row=await self.post(lambda _:s,{'messages':[{'role':'user','content':'fixture'}],'auto_continue':True},.5)
         self.assertEqual(response.status_code,504)
         self.assertEqual(row['trace']['failure'],{'stage':'websocket_receive','exception_class':'TimeoutError'})
         self.assertEqual(row['trace']['budget']['generation_posts'],1)
