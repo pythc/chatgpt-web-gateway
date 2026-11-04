@@ -58,7 +58,7 @@ Final acceptance and remaining web protocol boundaries: [validation.md](docs/val
 - [x] Make manual .env configuration the default English-first deployment flow.
 - [x] Complete regression, fresh Compose startup and local deployment checks.
 - [x] Publish the configuration cleanup and verify CI.
-- [ ] Merge configuration cleanup PR #2 into main.
+- [x] Merge configuration cleanup PR #2 into main.
 
 ## Additional live web qualification
 
