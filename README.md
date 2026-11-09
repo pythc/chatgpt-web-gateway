@@ -8,6 +8,8 @@
   <img src="https://img.shields.io/badge/Python-3.11-202824?style=flat-square" alt="Python 3.11">
 </p>
 
+[![M8ven Score](https://m8ven.ai/badge/mcp/pythc-chatgpt-web-gateway-5m8i7o?v=d09f855fd77a6a80db591fba55a440e4)](https://m8ven.ai/mcp/pythc-chatgpt-web-gateway-5m8i7o?s=readme)
+
 <p align="center"><strong>English</strong> · <a href="README.zh-CN.md">简体中文</a></p>
 
 <p align="center"><img src="docs/assets/cover.png" alt="An abstract gateway connecting a web session with developer tools" width="100%"></p>
