@@ -8,7 +8,9 @@
   <img src="https://img.shields.io/badge/Python-3.11-202824?style=flat-square" alt="Python 3.11">
 </p>
 
-[![M8ven Score](https://m8ven.ai/badge/mcp/pythc-chatgpt-web-gateway-5m8i7o?v=d09f855fd77a6a80db591fba55a440e4)](https://m8ven.ai/mcp/pythc-chatgpt-web-gateway-5m8i7o?s=readme)
+<p align="center">
+  <a href="https://m8ven.ai/mcp/pythc-chatgpt-web-gateway-5m8i7o?s=readme"><img src="https://m8ven.ai/badge/mcp/pythc-chatgpt-web-gateway-5m8i7o?v=d09f855fd77a6a80db591fba55a440e4" alt="M8ven Score"></a>
+</p>
 
 <p align="center"><strong>English</strong> · <a href="README.zh-CN.md">简体中文</a></p>
 
